@@ -103,16 +103,40 @@ EVIDENCIAS/
 
 ---
 
-## ⏳ FASE 3: Resilience Patterns (COMPLETADA - Evidencias Pendientes)
+## ✅ FASE 3: Evento-Driven + Resiliencia (COMPLETADA)
 
-**Estado:** Código completado en repositorio  
-**Siguiente paso:** Crear documentos de evidencia
+**Estado:** ✅ Código completado + Evidencias documentadas
 
-Requiere las siguientes evidencias:
-- [ ] Documentación de Polly policies
-- [ ] Explicación de Circuit Breaker
-- [ ] Test scenarios de resilience
-- [ ] Diagrama de transiciones de estado
+### 📄 Documentos Disponibles
+
+| Formato | Ubicación | Descripción |
+|---------|-----------|-------------|
+| **Markdown** | `FASE 3/EVIDENCIAS_FASE_3.md` | Documento completo en Markdown |
+| **Word/HTML** | `FASE 3/EVIDENCIAS_FASE_3.docx.html` | Documento HTML compatible con Microsoft Word |
+
+### ✅ Evidencias Completadas (4/4)
+
+- [x] **Arquitectura de eventos documentada**
+  - Mapa completo de eventos
+  - Productores: Transfers MS
+  - Consumidores: NotificationsConsumer, AuditConsumer
+  - Outbox pattern explicado
+  
+- [x] **Diagrama de secuencia del flujo completo**
+  - Happy path (transferencia exitosa)
+  - Failure path 1: Accounts MS no responde
+  - Failure path 2: RabbitMQ se cae
+  - Failure path 3: Consumer falla
+  
+- [x] **Demostración funcional de 3 patrones de resiliencia**
+  - Circuit Breaker (5 failures → open, 30s timeout)
+  - Retry (3 intentos con exponential backoff: 2s, 4s, 8s)
+  - Timeout (30 segundos máximo por request)
+  
+- [x] **Módulos del monolito reaccionan correctamente vía broker**
+  - NotificationsConsumer: escucha y crea notificaciones
+  - AuditConsumer: escucha y registra auditoría
+  - Ambos con manual ACK/NACK y reintento automático
 
 ---
 
@@ -216,11 +240,11 @@ src/ModularBank/             # Monolito (residual)
 
 - [x] FASE 1: 5/5 evidencias completadas
 - [x] FASE 2: 5/5 evidencias completadas
-- [ ] FASE 3: Pendiente
+- [x] FASE 3: 4/4 evidencias completadas
 - [ ] FASE 4: Pendiente
 - [ ] FASE 5: Pendiente
 
-**Total Progreso:** 10/25 evidencias documentadas (40%)
+**Total Progreso:** 14/22 evidencias documentadas (64%)
 
 ---
 

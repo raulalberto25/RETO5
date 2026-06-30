@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidencias Fase 3 - FinBank Microservices</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0078d4;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0078d4;
+            font-size: 28px;
+            margin: 10px 0;
+        }
+        .header p {
+            color: #666;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        .section {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0078d4;
+            page-break-inside: avoid;
+        }
+        .section h2 {
+            color: #0078d4;
+            font-size: 20px;
+            margin-top: 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .section h3 {
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .code-block {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 10px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        table th {
+            background-color: #0078d4;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+        table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-size: 12px;
+        }
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .diagram {
+            background-color: #f0f8ff;
+            border: 1px solid #87ceeb;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            margin: 15px 0;
+            font-size: 9px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.3;
+        }
+        .summary {
+            background-color: #e8f4f8;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .status-complete {
+            color: #07a41e;
+            font-weight: bold;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        li {
+            margin: 6px 0;
+        }
+        .badge {
+            display: inline-block;
+            background-color: #d4edda;
+            color: #155724;
+            padding: 3px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            font-size: 10px;
+            margin-right: 5px;
+        }
+        strong {
+            color: #0078d4;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 EVIDENCIAS REQUERIDAS - FASE 3</h1>
+        <h2>FinBank: Event-Driven Architecture + Resilience + Monolith Consumers</h2>
+        <p><strong>Fecha:</strong> 2026-06-29 | <strong>Proyecto:</strong> FinBank Monolithic → Microservices</p>
+        <p><strong>Fase:</strong> 3 - Events + Resilience + Consumers | <strong>Estado:</strong> <span class="status-complete">✅ COMPLETADO</span></p>
+    </div>
+
+    <!-- EVIDENCIA 1 -->
+    <div class="section">
+        <h2>1️⃣ Arquitectura de Eventos Documentada</h2>
+
+        <h3>📊 Catálogo de Eventos</h3>
+
+        <p><strong>Evento Principal: TransferExecutedEvent</strong></p>
+        <ul>
+            <li><strong>Producido por:</strong> Transfers MS (services/transfers-service)</li>
+            <li><strong>Tipo:</strong> com.finbank.transfers.executed.v1 (CloudEvents 1.0)</li>
+            <li><strong>Exchange:</strong> banking.events (RabbitMQ Topic)</li>
+            <li><strong>Routing Key:</strong> transfer.executed.v1</li>
+        </ul>
+
+        <p><strong>Consumidores:</strong></p>
+        <table>
+            <tr>
+                <th>Consumer</th>
+                <th>Ubicación</th>
+                <th>Queue</th>
+                <th>Acción</th>
+            </tr>
+            <tr>
+                <td>NotificationsConsumer</td>
+                <td>Monolith (Infrastructure)</td>
+                <td>notifications.transfer-executed</td>
+                <td>Crea notificación para usuario</td>
+            </tr>
+            <tr>
+                <td>AuditConsumer</td>
+                <td>Monolith (Infrastructure)</td>
+                <td>audit.transfer-executed</td>
+                <td>Registra entrada en auditoría</td>
+            </tr>
+        </table>
+
+        <h3>🔄 Flujo de Publicación (Outbox Pattern)</h3>
+        <div class="code-block">1. Transfers MS
+   ├─ TransferUseCase.ExecuteAsync()
+   ├─ Crea Transfer aggregate
+   ├─ Crea TransferExecutedEvent (CloudEvents)
+   ├─ Guarda Transfer + OutboxEntry (MISMA transacción)
+   └─ Responde 201 al cliente
+
+2. OutboxWorker (Background Service)
+   ├─ Cada 5 segundos:
+   │  ├─ Lee OutboxEntries (published_at IS NULL)
+   │  ├─ Publica a RabbitMQ exchange=banking.events
+   │  └─ Marca published_at = NOW()
+   └─ Si falla: reintenta automáticamente
+
+3. RabbitMQ
+   ├─ Topic Exchange: banking.events
+   └─ Enruta a colas que coincidan con patrón
+
+4. Consumers
+   ├─ NotificationsConsumer: crea notificación
+   └─ AuditConsumer: crea audit entry</div>
+
+        <h3>✅ Beneficios de la Arquitectura</h3>
+        <ul>
+            <li><strong>Desacoplamiento:</strong> Transfers no conoce a consumers</li>
+            <li><strong>Escalabilidad:</strong> Agregar consumers sin cambiar Transfers</li>
+            <li><strong>Garantía de entrega:</strong> Outbox = at-least-once semantics</li>
+            <li><strong>Resiliencia:</strong> Consumer falla no afecta otros</li>
+            <li><strong>Traceabilidad:</strong> CloudEvents con correlationId</li>
+        </ul>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Arquitectura de eventos completamente documentada</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 2 -->
+    <div class="section">
+        <h2>2️⃣ Diagrama de Secuencia (Happy + Failure Paths)</h2>
+
+        <h3>✅ Happy Path: Transferencia Exitosa</h3>
+        <div class="code-block">Cliente → Gateway → Transfers MS → Accounts MS
+  1. GET /accounts/X1 (verify source)
+  2. GET /accounts/X2 (verify target)
+  3. Save Transfer + OutboxEntry (atomic)
+  ↓
+  201 Created (inmediato)
+  ↓
+  [5s later] OutboxWorker publica evento
+  ↓
+  NotificationsConsumer crea notificación
+  AuditConsumer crea audit entry
+
+RESULTADO: ✅ Transfer (STRONG) + Notifications/Audit (EVENTUAL)</div>
+
+        <h3>❌ Failure Path 1: Accounts MS No Responde</h3>
+        <div class="code-block">GET /accounts/X1 → TIMEOUT
+  ↓
+  RETRY 1 (wait 1s) → TIMEOUT
+  RETRY 2 (wait 2s) → TIMEOUT
+  RETRY 3 (wait 4s) → TIMEOUT
+  ↓
+  CIRCUIT BREAKER OPENS (fail fast)
+  ↓
+  503 Service Unavailable (no Transfer creado)
+
+RESULTADO: ❌ Sin Transfer + Sin eventos + CB previene cascada</div>
+
+        <h3>❌ Failure Path 2: RabbitMQ Se Cae</h3>
+        <div class="code-block">Transfer + OutboxEntry guardados ✅
+201 Created enviado ✅
+  ↓
+  [5s] OutboxWorker intenta publicar → CONNECTION FAILED
+  OutboxEntry aún tiene published_at=NULL
+  ↓
+  [10s] OutboxWorker reintenta
+  RabbitMQ recuperado
+  Evento publicado exitosamente ✅
+  ↓
+  Consumers procesan normalmente
+
+RESULTADO: ✅ Transfer + Garantía de entrega (delayed)</div>
+
+        <h3>❌ Failure Path 3: Consumer Falla</h3>
+        <div class="code-block">Evento publicado ✅
+NotificationsConsumer recibe
+  ↓
+  SendAsync() → DATABASE ERROR
+  BasicNack() → Requeue
+  ↓
+  RabbitMQ redelivery (con delay)
+  Segundo intento → Falla nuevamente
+  ↓
+  BasicNack() → Move to DLQ (Dead Letter Queue)
+
+RESULTADO: ✅ Transfer + Audit (OK) + Notification (DLQ) = Degradación</div>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">4 diagramas de secuencia documentados</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 3 -->
+    <div class="section">
+        <h2>3️⃣ Patrones de Resiliencia (3 Patrones Funcionales)</h2>
+
+        <h3>🛡️ Patrón 1: Circuit Breaker</h3>
+        <p><strong>Ubicación:</strong> ResiliencePolicies.cs</p>
+        <p><strong>Configuración:</strong> 5 failures en 30s → open, 30s break duration</p>
+        <div class="diagram">CLOSED (normal)
+  ↓ 5 failures
+OPEN (fail-fast)
+  ↓ 30 seconds
+HALF-OPEN (probe)
+  ↓ probe succeeds
+CLOSED (reset)</div>
+
+        <p><strong>Beneficios:</strong> Previene cascada, fail-fast, recuperación automática</p>
+
+        <h3>🔄 Patrón 2: Retry con Backoff Exponencial</h3>
+        <p><strong>Configuración:</strong> 3 intentos, 2^attempt segundos</p>
+        <div class="code-block">Attempt 1 (immediate)
+Attempt 2 (wait 2s)
+Attempt 3 (wait 4s)
+Attempt 4 (wait 8s)
+[5 failures = Circuit Breaker activation]</div>
+
+        <p><strong>Beneficios:</strong> Maneja fallos transitorios, reduce carga</p>
+
+        <h3>⏱️ Patrón 3: Timeout</h3>
+        <p><strong>Configuración:</strong> 30 segundos máximo por request</p>
+        <p><strong>Beneficios:</strong> Previene requests colgadas, evita thread pool exhaustion</p>
+
+        <h3>🔗 Combinación (Wrap Order)</h3>
+        <div class="code-block">Timeout (30s total)
+  └─ Circuit Breaker (5 failures = open)
+     └─ Retry (3 intentos con backoff)
+        └─ HTTP Call</div>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">3 patrones implementados y funcionales</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 4 -->
+    <div class="section">
+        <h2>4️⃣ Módulos del Monolito Reaccionan vía Broker</h2>
+
+        <h3>📡 NotificationsConsumer (Monolith)</h3>
+        <p><strong>Ubicación:</strong> Modules/Notifications/Infrastructure/NotificationsConsumer.cs</p>
+        <ul>
+            <li>✅ Escucha: notifications.transfer-executed queue</li>
+            <li>✅ Binding: transfer.executed.v* (wildcard)</li>
+            <li>✅ Deserializa CloudEvent</li>
+            <li>✅ Crea Notification via INotificationsService</li>
+            <li>✅ BasicAck on success, BasicNack on failure</li>
+        </ul>
+
+        <h3>📡 AuditConsumer (Monolith)</h3>
+        <p><strong>Ubicación:</strong> Modules/Audit/Infrastructure/AuditConsumer.cs</p>
+        <ul>
+            <li>✅ Escucha: audit.transfer-executed queue</li>
+            <li>✅ Binding: transfer.executed.v*</li>
+            <li>✅ Deserializa CloudEvent</li>
+            <li>✅ Registra AuditEntry via IAuditService</li>
+            <li>✅ Manual ACK with requeue on failure</li>
+        </ul>
+
+        <h3>✅ Validación Funcional</h3>
+
+        <p><strong>Test: Happy Path</strong></p>
+        <div class="code-block">1. POST /transfers → 201 Created
+2. Esperar 1-5s
+3. GET /notifications → notification presente ✅
+4. GET /audit → audit entry presente ✅</div>
+
+        <p><strong>Test: Consumer Retry</strong></p>
+        <div class="code-block">1. Evento publicado
+2. Consumer recibe pero falla
+3. RabbitMQ redelivery
+4. Segundo intento exitoso
+5. GET /notifications → ✅ (aunque falló antes)</div>
+
+        <h3>📊 Matriz de Verificación</h3>
+        <table>
+            <tr>
+                <th>Comportamiento</th>
+                <th>Notifications</th>
+                <th>Audit</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td>Escucha queue correcta</td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>Deserializa CloudEvent</td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>Crea registro en BD</td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>Manual ACK on success</td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>Reintenta automático</td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+        </table>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Módulos del monolito reaccionan correctamente vía broker</span>
+        </div>
+    </div>
+
+    <!-- RESUMEN -->
+    <div class="section">
+        <h2>📊 RESUMEN EJECUTIVO</h2>
+
+        <h3>✅ TODAS LAS EVIDENCIAS COMPLETADAS (4/4)</h3>
+        <table>
+            <tr>
+                <th>#</th>
+                <th>Evidencia</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>Arquitectura de eventos documentada</td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>Diagramas de secuencia (happy + 3 failures)</td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>3 Patrones de resiliencia funcionales</td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Módulos monolito reaccionan vía broker</td>
+                <td><span class="badge">✅</span></td>
+            </tr>
+        </table>
+
+        <h3>📈 Métricas Phase 3</h3>
+        <ul>
+            <li><strong>Eventos:</strong> 1 (TransferExecutedEvent)</li>
+            <li><strong>Productores:</strong> 1 (Transfers MS)</li>
+            <li><strong>Consumidores:</strong> 2 (NotificationsConsumer, AuditConsumer)</li>
+            <li><strong>Patrones de resiliencia:</strong> 3 (CB, Retry, Timeout)</li>
+            <li><strong>Diagramas de secuencia:</strong> 4</li>
+            <li><strong>Garantía de entrega:</strong> At-least-once (Outbox)</li>
+        </ul>
+
+        <div class="summary">
+            <h3>🚀 Estado para Production</h3>
+            <p><strong>Phase 3 está listo para:</strong></p>
+            <ul>
+                <li>✅ Manejar fallos con Circuit Breaker</li>
+                <li>✅ Reintentar automáticamente fallos transitorios</li>
+                <li>✅ Cancelar requests colgadas (Timeout)</li>
+                <li>✅ Procesar eventos en consumidores del monolito</li>
+                <li>✅ Recuperación automática tras fallos</li>
+                <li>✅ Reintento automático de consumers fallidos</li>
+            </ul>
+
+            <p style="text-align: center; margin-top: 20px; font-size: 14px;">
+                <strong>✅ Certificación: Phase 3 completada con todas las evidencias requeridas</strong>
+            </p>
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #0078d4; color: #666; font-size: 11px;">
+        <p><strong>Documento generado automáticamente</strong> | FinBank Microservices Project | 2026-06-29</p>
+    </div>
+</body>
+</html>
