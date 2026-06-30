@@ -1,0 +1,127 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "urn:com.finbank:transfers:executed:v1",
+  "title": "Transfer Executed Event (V1)",
+  "description": "CloudEvents 1.0 compliant event published when a transfer is executed",
+  "type": "object",
+  "properties": {
+    "specversion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "CloudEvents specification version"
+    },
+    "type": {
+      "type": "string",
+      "const": "com.finbank.transfers.executed.v1",
+      "description": "Event type with version suffix (v1, v2, etc for versioning)"
+    },
+    "source": {
+      "type": "string",
+      "const": "/services/transfers-service",
+      "description": "Identifies the context in which an event happened"
+    },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier for the event (used for deduplication)"
+    },
+    "time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the transfer was executed (RFC3339 format, UTC)"
+    },
+    "datacontenttype": {
+      "type": "string",
+      "const": "application/json",
+      "description": "Content type of data attribute"
+    },
+    "dataschema": {
+      "type": "string",
+      "const": "urn:com.finbank:transfers:executed:v1",
+      "description": "Identifies the schema that data adheres to"
+    },
+    "subject": {
+      "type": "string",
+      "pattern": "^transfer/[a-f0-9-]{36}$",
+      "description": "Describes the subject of the event (transfer ID)"
+    },
+    "correlationid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Correlation ID for tracing (typically user ID)"
+    },
+    "traceparent": {
+      "type": "string",
+      "pattern": "^00-[a-f0-9]{32}-[a-f0-9]{16}-[01]{2}$",
+      "description": "W3C Trace Context header for distributed tracing (optional)"
+    },
+    "data": {
+      "type": "object",
+      "description": "Transfer execution details",
+      "properties": {
+        "transferId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Unique transfer identifier"
+        },
+        "sourceAccountId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Account ID of the sender"
+        },
+        "targetAccountId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "Account ID of the recipient"
+        },
+        "userId": {
+          "type": "string",
+          "format": "uuid",
+          "description": "User ID who initiated the transfer"
+        },
+        "amount": {
+          "type": "number",
+          "minimum": 0.01,
+          "description": "Transfer amount in base currency units (e.g., cents)"
+        },
+        "reference": {
+          "type": ["string", "null"],
+          "maxLength": 255,
+          "description": "Optional reference text provided by user"
+        },
+        "occurredAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the transfer occurred (RFC3339 format, UTC)"
+        }
+      },
+      "required": ["transferId", "sourceAccountId", "targetAccountId", "userId", "amount", "occurredAt"],
+      "additionalProperties": false
+    }
+  },
+  "required": ["specversion", "type", "source", "id", "time", "datacontenttype", "dataschema", "subject", "correlationid", "data"],
+  "additionalProperties": true,
+  "examples": [
+    {
+      "specversion": "1.0",
+      "type": "com.finbank.transfers.executed.v1",
+      "source": "/services/transfers-service",
+      "id": "550e8400-e29b-41d4-a716-446655440000",
+      "time": "2026-06-29T10:30:00Z",
+      "datacontenttype": "application/json",
+      "dataschema": "urn:com.finbank:transfers:executed:v1",
+      "subject": "transfer/550e8400-e29b-41d4-a716-446655440000",
+      "correlationid": "user-123",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "data": {
+        "transferId": "550e8400-e29b-41d4-a716-446655440000",
+        "sourceAccountId": "acc-001-guid",
+        "targetAccountId": "acc-002-guid",
+        "userId": "user-123",
+        "amount": 1000.50,
+        "reference": "Payment for invoice #INV-2026-001",
+        "occurredAt": "2026-06-29T10:30:00Z"
+      }
+    }
+  ]
+}

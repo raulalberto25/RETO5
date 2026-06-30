@@ -1,0 +1,65 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'finbank-local'
+    environment: 'development'
+
+scrape_configs:
+  # Jaeger - OTLP metrics receiver
+  - job_name: 'jaeger'
+    static_configs:
+      - targets: ['jaeger:14269']
+    metrics_path: '/metrics'
+
+  # Gateway metrics (if exposed)
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Accounts Service metrics (if exposed)
+  - job_name: 'accounts-service'
+    static_configs:
+      - targets: ['accounts-service:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Transfers Service metrics (if exposed)
+  - job_name: 'transfers-service'
+    static_configs:
+      - targets: ['transfers-service:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Monolith metrics (if exposed)
+  - job_name: 'monolith'
+    static_configs:
+      - targets: ['monolith:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # RabbitMQ metrics
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # PostgreSQL metrics (if using postgres_exporter)
+  # Uncomment when postgres_exporter is deployed
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # Uncomment to enable alerting
+          # - 'alertmanager:9093'
+
+rule_files:
+  # Add alert rules here when needed
+  # - '/etc/prometheus/rules/*.yml'

@@ -1,0 +1,2538 @@
+The directory is essentially empty. Let me now provide a comprehensive implementation plan for the FinBank Microservices Migration Challenge.
+
+---
+
+# FinBank Microservices Migration Challenge - Implementation Plan
+
+## Executive Summary
+
+This plan guides the migration from a modular monolith to microservices architecture using the Strangler Fig pattern, implementing banking-specific patterns, ensuring regulatory compliance, and establishing comprehensive observability. The approach prioritizes zero-downtime migration, eventual consistency with Saga patterns, and maintaining HTTP contract compatibility for existing consumers.
+
+## Phase 0: Pre-requisite Setup and Infrastructure
+
+### 0.1 Project Structure Foundation
+
+```
+D:\CURSOS\RETO5\
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ Monolith/                              # Original monolith (read-only initially)
+â”‚   â”‚   â”œâ”€â”€ FinBank.Monolith.csproj
+â”‚   â”‚   â”œâ”€â”€ Features/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Accounts/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Transactions/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Customers/
+â”‚   â”‚   â”‚   â””â”€â”€ Loans/
+â”‚   â”‚   â””â”€â”€ Data/
+â”‚   â”‚
+â”‚   â”œâ”€â”€ Gateway/                               # API Gateway (Strangler Fig entry point)
+â”‚   â”‚   â”œâ”€â”€ FinBank.Gateway.csproj
+â”‚   â”‚   â”œâ”€â”€ Program.cs                         # YARP configuration
+â”‚   â”‚   â”œâ”€â”€ Middleware/
+â”‚   â”‚   â”‚   â”œâ”€â”€ RequestCorrelationMiddleware.cs
+â”‚   â”‚   â”‚   â”œâ”€â”€ AuthenticationMiddleware.cs
+â”‚   â”‚   â”‚   â””â”€â”€ ErrorHandlingMiddleware.cs
+â”‚   â”‚   â”œâ”€â”€ ReverseProxy/
+â”‚   â”‚   â”‚   â””â”€â”€ appsettings.json               # Route config for services
+â”‚   â”‚   â””â”€â”€ Startup/
+â”‚   â”‚
+â”‚   â”œâ”€â”€ Services/
+â”‚   â”‚   â”œâ”€â”€ AccountService/                    # First service extraction
+â”‚   â”‚   â”‚   â”œâ”€â”€ FinBank.AccountService.csproj
+â”‚   â”‚   â”‚   â”œâ”€â”€ Application/
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Commands/
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Queries/
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ Events/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Domain/
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Account.cs
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ AccountEvents.cs
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ Rules/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Infrastructure/
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ Persistence/
+â”‚   â”‚   â”‚   â”‚   â”œâ”€â”€ ExternalServices/
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ MessageQueue/
+â”‚   â”‚   â”‚   â”œâ”€â”€ API/
+â”‚   â”‚   â”‚   â”‚   â””â”€â”€ Controllers/
+â”‚   â”‚   â”‚   â””â”€â”€ Program.cs
+â”‚   â”‚   â”‚
+â”‚   â”‚   â”œâ”€â”€ TransactionService/                # Second service extraction
+â”‚   â”‚   â”‚   â”œâ”€â”€ FinBank.TransactionService.csproj
+â”‚   â”‚   â”‚   â”œâ”€â”€ Application/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Domain/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Infrastructure/
+â”‚   â”‚   â”‚   â”œâ”€â”€ Sagas/                         # Saga orchestrators
+â”‚   â”‚   â”‚   â”œâ”€â”€ API/
+â”‚   â”‚   â”‚   â””â”€â”€ Program.cs
+â”‚   â”‚   â”‚
+â”‚   â”‚   â””â”€â”€ NotificationService/
+â”‚   â”‚       â”œâ”€â”€ FinBank.NotificationService.csproj
+â”‚   â”‚       â””â”€â”€ ... (similar structure)
+â”‚   â”‚
+â”‚   â”œâ”€â”€ Shared/
+â”‚   â”‚   â”œâ”€â”€ FinBank.Shared.csproj
+â”‚   â”‚   â”œâ”€â”€ Events/
+â”‚   â”‚   â”‚   â”œâ”€â”€ DomainEventBase.cs
+â”‚   â”‚   â”‚   â”œâ”€â”€ EventContracts.cs              # Versioned event contracts
+â”‚   â”‚   â”‚   â””â”€â”€ EventSchemas/
+â”‚   â”‚   â”œâ”€â”€ Contracts/
+â”‚   â”‚   â”‚   â””â”€â”€ HttpContractDefinitions.cs     # API contract definitions
+â”‚   â”‚   â”œâ”€â”€ Resilience/
+â”‚   â”‚   â”‚   â”œâ”€â”€ BankingSpecificPolicies.cs
+â”‚   â”‚   â”‚   â”œâ”€â”€ DeadLetterStrategies.cs
+â”‚   â”‚   â”‚   â””â”€â”€ CircuitBreakerConfig.cs
+â”‚   â”‚   â”œâ”€â”€ Observability/
+â”‚   â”‚   â”‚   â”œâ”€â”€ CorrelationIdProvider.cs
+â”‚   â”‚   â”‚   â”œâ”€â”€ InstrumentationExtensions.cs
+â”‚   â”‚   â”‚   â””â”€â”€ TraceContextPropagation.cs
+â”‚   â”‚   â””â”€â”€ Exceptions/
+â”‚   â”‚       â””â”€â”€ BankingSpecificExceptions.cs
+â”‚   â”‚
+â”‚   â””â”€â”€ Sagas/
+â”‚       â”œâ”€â”€ FinBank.Sagas.csproj
+â”‚       â”œâ”€â”€ Transactions/
+â”‚       â”‚   â”œâ”€â”€ CreateTransactionSaga.cs       # Multi-step saga
+â”‚       â”‚   â”œâ”€â”€ CreateTransactionSagaState.cs
+â”‚       â”‚   â””â”€â”€ TransactionSagaSteps.cs
+â”‚       â””â”€â”€ Transfers/
+â”‚
+â”œâ”€â”€ docker-compose.yml                         # Local development environment
+â”œâ”€â”€ docker-compose.prod.yml                    # Production-like setup
+â”œâ”€â”€ CLAUDE.md                                  # Codebase documentation
+â”œâ”€â”€ docs/
+â”‚   â”œâ”€â”€ ARCHITECTURE.md                        # Overall architecture
+â”‚   â”œâ”€â”€ ADR/                                   # Architectural Decision Records
+â”‚   â”‚   â”œâ”€â”€ 0001-strangler-fig-pattern.md
+â”‚   â”‚   â”œâ”€â”€ 0002-kafka-vs-rabbitmq.md
+â”‚   â”‚   â”œâ”€â”€ 0003-yarp-api-gateway.md
+â”‚   â”‚   â”œâ”€â”€ 0004-database-per-service.md
+â”‚   â”‚   â”œâ”€â”€ 0005-saga-pattern-orchestration.md
+â”‚   â”‚   â”œâ”€â”€ 0006-eventual-consistency.md
+â”‚   â”‚   â”œâ”€â”€ 0007-banking-regulatory-compliance.md
+â”‚   â”‚   â”œâ”€â”€ 0008-distributed-tracing-strategy.md
+â”‚   â”‚   â”œâ”€â”€ 0009-service-versioning.md
+â”‚   â”‚   â”œâ”€â”€ 0010-dead-letter-queues.md
+â”‚   â”‚   â””â”€â”€ 0011-canary-deployment-strategy.md
+â”‚   â”œâ”€â”€ EVENT_CONTRACTS.md                     # Event schema documentation
+â”‚   â”œâ”€â”€ API_CONTRACTS.md                       # HTTP API contracts
+â”‚   â”œâ”€â”€ RESILIENCE_PATTERNS.md                 # Banking-specific resilience patterns
+â”‚   â”œâ”€â”€ OBSERVABILITY.md                       # OpenTelemetry setup
+â”‚   â”œâ”€â”€ MIGRATION_RUNBOOK.md                   # Step-by-step migration
+â”‚   â””â”€â”€ TROUBLESHOOTING.md
+â”‚
+â”œâ”€â”€ infrastructure/
+â”‚   â”œâ”€â”€ kubernetes/                            # K8s manifests for production
+â”‚   â”‚   â”œâ”€â”€ account-service.yaml
+â”‚   â”‚   â”œâ”€â”€ transaction-service.yaml
+â”‚   â”‚   â”œâ”€â”€ api-gateway.yaml
+â”‚   â”‚   â””â”€â”€ monitoring-stack.yaml
+â”‚   â””â”€â”€ terraform/                             # IaC for cloud deployment
+â”‚
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ FinBank.Gateway.Tests/
+â”‚   â”œâ”€â”€ FinBank.AccountService.Tests/
+â”‚   â”œâ”€â”€ FinBank.TransactionService.Tests/
+â”‚   â”œâ”€â”€ FinBank.Integration.Tests/
+â”‚   â””â”€â”€ FinBank.Saga.Tests/
+â”‚
+â”œâ”€â”€ monitoring/
+â”‚   â”œâ”€â”€ prometheus/
+â”‚   â”‚   â””â”€â”€ prometheus.yml
+â”‚   â”œâ”€â”€ grafana/
+â”‚   â”‚   â”œâ”€â”€ dashboards/
+â”‚   â”‚   â”‚   â”œâ”€â”€ service-health.json
+â”‚   â”‚   â”‚   â”œâ”€â”€ transaction-flow.json
+â”‚   â”‚   â”‚   â””â”€â”€ sag-orchestration.json
+â”‚   â”‚   â””â”€â”€ provisioning/
+â”‚   â”œâ”€â”€ jaeger/
+â”‚   â”‚   â””â”€â”€ jaeger-config.yml
+â”‚   â””â”€â”€ loki/
+â”‚       â””â”€â”€ loki-config.yml
+â”‚
+â””â”€â”€ scripts/
+    â”œâ”€â”€ setup-local-env.ps1
+    â”œâ”€â”€ run-migrations.sh
+    â”œâ”€â”€ health-check.sh
+    â””â”€â”€ smoke-tests.sh
+```
+
+### 0.2 Infrastructure Prerequisites
+
+**Technology Stack Decisions:**
+
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| Runtime | .NET 10 | Latest LTS, excellent performance, native AOT support |
+| Architecture | Clean Architecture + SOLID | Domain-driven design, testability, maintainability |
+| API Gateway | YARP | .NET-native, low latency, easy integration with services |
+| Message Broker | Kafka | High throughput, event stream durability, excellent for audit logs (regulatory requirement) |
+| Saga Pattern | Choreography + Orchestration Hybrid | Choreography for simple flows, orchestrator for complex banking workflows |
+| Observability | OpenTelemetry + Jaeger/Loki/Prometheus | Vendor-neutral, comprehensive distributed tracing |
+| Containers | Docker + Docker Compose | Development parity with production |
+| Testing | xUnit + MassTransit Test Harness | Standard .NET testing, Kafka simulation |
+
+**Docker Compose Environment Setup**
+
+```yaml
+# docker-compose.yml structure:
+- Kafka cluster (3 brokers for HA)
+- Zookeeper (Kafka coordination)
+- PostgreSQL instances (Account service DB + Transaction service DB)
+- Redis (distributed cache for idempotency)
+- Jaeger (distributed tracing)
+- Prometheus (metrics collection)
+- Grafana (visualization)
+- API Gateway (YARP)
+- Account Service instance
+- Transaction Service instance
+```
+
+---
+
+## Phase 1: Service Extraction - Accounts Service
+
+### 1.1 Foundation: API Gateway Setup with YARP
+
+**Objective:** Establish the Strangler Fig entry point. All requests flow through the gateway, which routes to either the monolith (legacy paths) or extracted services (new paths).
+
+#### Step 1.1.1: Create Gateway Project
+
+**Files to create:**
+- `src/Gateway/FinBank.Gateway.csproj` - Project file with YARP dependencies
+- `src/Gateway/Program.cs` - Gateway configuration with route mapping
+- `src/Gateway/appsettings.json` - Route definitions for Strangler Fig
+
+**Key implementation details:**
+
+```
+Gateway Program.cs structure:
+1. Register YARP reverse proxy
+2. Configure route definitions
+3. Add middleware for correlation IDs (critical for observability)
+4. Implement authentication/authorization middleware
+5. Add error handling middleware with banking-specific error codes
+6. Configure health checks for backend services
+
+Route strategy:
+- POST /api/accounts/* â†’ AccountService
+- POST /api/transactions/* â†’ TransactionService (after Phase 2)
+- All other routes â†’ Monolith (Strangler Fig pattern)
+
+Middleware chain:
+1. Correlation ID (generate/propagate)
+2. Authentication (JWT validation)
+3. Authorization (role-based)
+4. Error handling (banking domain exceptions)
+5. YARP reverse proxy
+6. Observability (metrics/tracing)
+```
+
+#### Step 1.1.2: Implement Cross-Cutting Concerns
+
+**Files to create:**
+- `src/Shared/Observability/CorrelationIdProvider.cs` - Generates unique request IDs
+- `src/Shared/Observability/TraceContextPropagation.cs` - W3C Trace Context propagation
+- `src/Gateway/Middleware/RequestCorrelationMiddleware.cs` - Middleware registration
+- `src/Shared/Exceptions/BankingSpecificExceptions.cs` - Domain exception hierarchy
+
+**Banking domain exceptions:**
+- `InsufficientFundsException` - Specific regulatory requirement
+- `AccountLockedException` - Fraud detection
+- `ComplianceViolationException` - KYC/AML failures
+- `DuplicateTransactionException` - Idempotency violation
+- `ServiceUnavailableException` - Graceful degradation
+
+### 1.2 Account Service Extraction
+
+**Objective:** Extract Account management from monolith into first microservice, maintaining HTTP contract compatibility.
+
+#### Step 1.2.1: Project Structure with Clean Architecture
+
+**Files to create:**
+- `src/Services/AccountService/FinBank.AccountService.csproj`
+- `src/Services/AccountService/Program.cs` - Dependency injection & Kafka setup
+
+**Domain Layer:**
+```
+Domain/
+â”œâ”€â”€ Account.cs                          # Aggregate root
+â”‚   - AccountId (value object)
+â”‚   - CustomerId
+â”‚   - AccountType (Checking, Savings, Business)
+â”‚   - Balance (with decimal precision for banking)
+â”‚   - Status (Active, Suspended, Closed)
+â”‚   - CreatedAt, UpdatedAt
+â”‚   - Methods: Create, Suspend, Activate, Close
+â”‚   - Domain invariants (regulatory constraints)
+â”‚
+â”œâ”€â”€ ValueObjects/
+â”‚   â”œâ”€â”€ AccountId.cs                    # Strongly-typed ID
+â”‚   â”œâ”€â”€ Money.cs                        # Currency + amount (CRITICAL for banking)
+â”‚   â”œâ”€â”€ IBAN.cs                         # Account identifier
+â”‚   â””â”€â”€ AccountStatus.cs
+â”‚
+â”œâ”€â”€ Events/
+â”‚   â”œâ”€â”€ AccountCreatedEvent.cs          # Event contracts (serializable)
+â”‚   â”œâ”€â”€ AccountSuspendedEvent.cs
+â”‚   â”œâ”€â”€ AccountClosedEvent.cs
+â”‚   â””â”€â”€ AccountBalanceUpdatedEvent.cs
+â”‚
+â””â”€â”€ Rules/
+    â”œâ”€â”€ MinimumBalanceRule.cs           # Regulatory rule
+    â”œâ”€â”€ DailyWithdrawalLimitRule.cs     # Compliance
+    â””â”€â”€ AgeOfAccountRule.cs             # KYC requirement
+```
+
+**Application Layer:**
+```
+Application/
+â”œâ”€â”€ Commands/
+â”‚   â”œâ”€â”€ CreateAccountCommand.cs         # Input DTO
+â”‚   â”œâ”€â”€ CreateAccountCommandHandler.cs  # Business logic
+â”‚   â”œâ”€â”€ SuspendAccountCommand.cs
+â”‚   â””â”€â”€ CloseAccountCommand.cs
+â”‚
+â”œâ”€â”€ Queries/
+â”‚   â”œâ”€â”€ GetAccountByIdQuery.cs
+â”‚   â”œâ”€â”€ GetAccountByIbanQuery.cs
+â”‚   â”œâ”€â”€ GetAccountsByCustomerQuery.cs
+â”‚   â””â”€â”€ GetAccountBalanceQuery.cs
+â”‚
+â”œâ”€â”€ Events/
+â”‚   â””â”€â”€ DomainEventPublisher.cs        # Kafka publishing
+â”‚
+â””â”€â”€ DTOs/
+    â”œâ”€â”€ CreateAccountRequest.cs         # HTTP request format (IMMUTABLE for contracts)
+    â””â”€â”€ AccountResponse.cs              # HTTP response format
+```
+
+**Infrastructure Layer:**
+```
+Infrastructure/
+â”œâ”€â”€ Persistence/
+â”‚   â”œâ”€â”€ AccountRepository.cs            # EF Core implementation
+â”‚   â”œâ”€â”€ UnitOfWork.cs                   # Transaction management
+â”‚   â”œâ”€â”€ AccountDbContext.cs             # DbContext with shadow properties for audit
+â”‚   â””â”€â”€ Migrations/
+â”‚       â””â”€â”€ InitialCreate.cs            # Database schema
+â”‚
+â”œâ”€â”€ MessageQueue/
+â”‚   â”œâ”€â”€ KafkaEventPublisher.cs          # Kafka producer
+â”‚   â”œâ”€â”€ TopicConfig.cs                  # Topic definitions
+â”‚   â””â”€â”€ EventSerializationConfig.cs     # JSON schema versioning
+â”‚
+â”œâ”€â”€ ExternalServices/
+â”‚   â”œâ”€â”€ CustomerServiceClient.cs        # HTTP client to validate customer exists
+â”‚   â””â”€â”€ HttpClientConfig.cs             # Resilience policies (circuit breaker)
+â”‚
+â””â”€â”€ Configuration/
+    â”œâ”€â”€ ServiceConfiguration.cs
+    â””â”€â”€ DataAccessConfiguration.cs
+```
+
+**API Layer:**
+```
+API/
+â”œâ”€â”€ Controllers/
+â”‚   â”œâ”€â”€ AccountsController.cs           # REST endpoints
+â”‚   â”‚   - POST /api/accounts
+â”‚   â”‚   - GET /api/accounts/{id}
+â”‚   â”‚   - GET /api/accounts/iban/{iban}
+â”‚   â”‚   - PUT /api/accounts/{id}/suspend
+â”‚   â”‚   - PUT /api/accounts/{id}/close
+â”‚   â”‚
+â”‚   â””â”€â”€ HealthController.cs             # Liveness/readiness probes
+â”‚
+â””â”€â”€ Middleware/
+    â”œâ”€â”€ ApiKeyValidationMiddleware.cs   # Service-to-service auth
+    â””â”€â”€ ExceptionHandlerMiddleware.cs   # Convert domain exceptions to HTTP
+```
+
+#### Step 1.2.2: Database Setup - Account Service DB
+
+**Files to create:**
+- `src/Services/AccountService/Infrastructure/Persistence/AccountDbContext.cs`
+- `src/Services/AccountService/Infrastructure/Persistence/Migrations/[timestamp]_InitialSchema.cs`
+
+**Critical Banking Requirements in Schema:**
+```
+Tables:
+- Accounts
+  - Id (GUID, primary key)
+  - AccountNumber (unique, immutable)
+  - IBAN (unique, validated)
+  - CustomerId (GUID, foreign key reference to Customer in monolith initially)
+  - AccountType (enum: Checking, Savings, Business)
+  - Balance (decimal(18,2) - critical precision)
+  - Currency (ISO 4217 code)
+  - Status (enum: Active, Suspended, Closed)
+  - CreatedAt (UTC)
+  - ModifiedAt (UTC)
+  - CreatedBy (audit trail)
+  - ModifiedBy (audit trail)
+  
+- AccountHistory (audit log)
+  - Id
+  - AccountId
+  - OperationType (Created, Activated, Suspended, Closed, BalanceUpdated)
+  - OldValues (JSON)
+  - NewValues (JSON)
+  - Timestamp (UTC)
+  - UserId
+
+Indexes:
+- (CustomerId) - for customer queries
+- (Status, CreatedAt) - for reporting
+- (IBAN) - unique lookup
+```
+
+#### Step 1.2.3: Kafka Integration for Domain Events
+
+**Files to create:**
+- `src/Services/AccountService/Infrastructure/MessageQueue/KafkaEventPublisher.cs`
+- `src/Services/AccountService/Infrastructure/MessageQueue/TopicConfiguration.cs`
+- `src/Shared/Events/AccountEventContracts.cs`
+
+**Event Publishing Strategy:**
+```
+Topic: account-events
+- Partitions: 10 (for parallelism)
+- Replication Factor: 3 (HA)
+- Retention: 7 days (regulatory audit trail)
+
+Event versioning:
+{
+  "eventType": "AccountCreated",
+  "version": "1.0",
+  "aggregateId": "account-123",
+  "aggregateType": "Account",
+  "timestamp": "2026-06-14T10:00:00Z",
+  "correlationId": "request-456",
+  "causationId": "command-789",
+  "data": {
+    "accountId": "account-123",
+    "customerId": "customer-456",
+    "accountNumber": "1234567890",
+    "iban": "DE89370400440532013000",
+    "accountType": "Checking",
+    "currency": "EUR"
+  }
+}
+
+Publishing point: UnitOfWork.SaveChangesAsync()
+- Collects all domain events from aggregates
+- Publishes to Kafka after commit
+- Uses outbox pattern fallback (Phase 3)
+```
+
+### 1.3 Maintaining HTTP Contract Compatibility
+
+**Objective:** Ensure existing consumers (mobile apps, web frontends, third-party integrations) see no breaking changes.
+
+#### Step 1.3.1: HTTP Contract Definition
+
+**Files to create:**
+- `docs/API_CONTRACTS.md` - Versioned API contract specification
+- `src/Shared/Contracts/HttpContractDefinitions.cs` - Contract validation
+
+**Contract Examples:**
+```
+Contract: GET /api/accounts/{id}
+- Introduced: 2026-01-01
+- Status: Stable
+- Deprecation: None
+- Response schema (versioned):
+  {
+    "id": "string (UUID)",
+    "accountNumber": "string",
+    "iban": "string",
+    "customerId": "string (UUID)",
+    "accountType": "enum (Checking|Savings|Business)",
+    "balance": "number (decimal)",
+    "currency": "string (ISO 4217)",
+    "status": "enum (Active|Suspended|Closed)",
+    "createdAt": "string (ISO 8601)",
+    "modifiedAt": "string (ISO 8601)"
+  }
+- Error responses:
+  - 404: Account not found
+  - 403: Customer not authorized to view account
+  - 500: Internal error (with bank error code)
+
+Contract: POST /api/accounts
+- Required fields: customerId, accountType, currency, initialBalance
+- Idempotency header: Idempotency-Key (UUID)
+- Returns: 201 Created with Location header
+- Side effect: Publishes AccountCreatedEvent to Kafka
+```
+
+#### Step 1.3.2: API Versioning Strategy
+
+**Implementation:**
+```
+Gateway routes:
+- POST /api/v1/accounts â†’ AccountService (current)
+- POST /api/v2/accounts â†’ AccountService (future, if changes needed)
+
+Version management:
+- Use URL versioning (not header-based) for clarity
+- Monolith endpoints remain unchanged
+- When contract changes required:
+  1. Create new version endpoint
+  2. Keep old version for 6 months (regulatory requirement)
+  3. Document breaking changes in CHANGELOG.md
+  4. Notify API consumers 3 months in advance
+```
+
+### 1.4 Testing & Validation
+
+#### Step 1.4.1: Unit Tests
+
+**Files to create:**
+- `tests/FinBank.AccountService.Tests/Domain/AccountTests.cs`
+- `tests/FinBank.AccountService.Tests/Application/CreateAccountCommandHandlerTests.cs`
+
+**Testing strategy:**
+```
+Domain tests:
+- Create valid account, verify state
+- Attempt invalid operations (e.g., close already-closed account)
+- Verify invariants enforced (min balance rules, etc.)
+- Domain event generation
+
+Application tests:
+- CreateAccountCommandHandler:
+  - Valid input â†’ creates account + publishes event
+  - Invalid customer ID â†’ throws exception
+  - Duplicate account number â†’ throws exception
+- GetAccountByIdQuery:
+  - Existing account â†’ returns DTO
+  - Non-existent account â†’ returns null
+  - Customer authorization check
+
+Integration tests (separate project):
+- Create account via HTTP POST
+- Verify account in database
+- Verify AccountCreatedEvent published to Kafka
+- Verify response contract matches API specification
+```
+
+#### Step 1.4.2: Contract Testing
+
+**Files to create:**
+- `tests/FinBank.AccountService.Tests/API/ContractTests.cs`
+
+**Strategy:**
+```
+Use Pact framework for HTTP contract testing:
+- Define consumer expectations (Gateway, mobile app)
+- Define provider responses (AccountService)
+- Generate and validate pact files
+- CI/CD validates contracts before merge
+
+Kafka contract tests:
+- Verify event schema matches Avro definition
+- Test event versioning (old + new versions deserialize correctly)
+- Test serialization round-trip
+```
+
+#### Step 1.4.3: Load Testing
+
+**Tool:** NBomber or Apache JMeter
+
+```
+Baseline: Create 1000 accounts/sec
+- Target latency: p99 < 100ms
+- Error rate: < 0.1%
+
+Ramp-up phase:
+- Start: 100 req/sec
+- Increment: +100 req/sec every 60s
+- Peak: 1000 req/sec
+- Duration: 5 minutes at peak
+
+Success criteria:
+- p99 latency < 150ms (allow some headroom)
+- p95 latency < 100ms
+- Error rate < 0.1%
+```
+
+### 1.5 Architecture Documentation
+
+#### Step 1.5.1: Architecture Diagram
+
+**Files to create:**
+- `docs/ARCHITECTURE.md` - System architecture with diagrams
+
+```
+Diagram 1: Service Extraction - Phase 1
+
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚         API Consumers                   â”‚
+â”‚  (Mobile, Web, Third-party)             â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                 â”‚ All HTTP requests
+                 â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚    API Gateway (YARP)                   â”‚
+â”‚  - Correlation ID                       â”‚
+â”‚  - Authentication                       â”‚
+â”‚  - Request routing                      â”‚
+â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+       â”‚                      â”‚
+       â”‚ Monolith routes      â”‚ Account Service routes
+       â”‚ (all others)         â”‚ (POST /api/accounts/*)
+       â”‚                      â”‚
+       â–¼                      â–¼
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+â”‚  Monolith    â”‚    â”‚ Account Service      â”‚
+â”‚              â”‚    â”‚ - REST API           â”‚
+â”‚ Database     â”‚    â”‚ - Domain logic       â”‚
+â”‚              â”‚    â”‚ - Event publishing   â”‚
+â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜    â”‚                      â”‚
+                    â””â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                           â”‚
+                           â”‚ Publishes
+                           â”‚ AccountCreatedEvent
+                           â”‚
+                           â–¼
+                    â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
+                    â”‚ Kafka Cluster  â”‚
+                    â”‚ (Event Stream) â”‚
+                    â””â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”˜
+                           â”‚
+                           â”‚ Topic: account-events
+                           â”‚
+                           â”œâ”€â†’ Other services (future)
+                           â””â”€â†’ Event log (compliance)
+```
+
+#### Step 1.5.2: ADRs for Phase 1
+
+**Files to create:**
+- `docs/ADR/0001-strangler-fig-pattern.md`
+- `docs/ADR/0002-kafka-vs-rabbitmq.md`
+- `docs/ADR/0003-yarp-api-gateway.md`
+- `docs/ADR/0004-database-per-service.md`
+
+**ADR 0001 Example Structure:**
+```
+# ADR 0001: Strangler Fig Pattern for Monolith Migration
+
+## Context
+Large banking monolith with 50+ services. Need to extract services incrementally
+without requiring full system rewrite. Production system cannot afford downtime.
+
+## Decision
+Adopt Strangler Fig pattern:
+1. New API Gateway routes requests
+2. Gateway routes known endpoints to new services
+3. Unknown endpoints routed to monolith (legacy)
+4. Gradually extract services as they mature
+5. Eventually monolith becomes empty and is decommissioned
+
+## Alternatives Considered
+1. Big Bang Rewrite
+   - Pros: Clean slate, optimal design
+   - Cons: High risk, requires 6+ months, business cannot add features
+
+2. Feature Branching
+   - Pros: Simpler locally
+   - Cons: Merge conflicts, doesn't solve distributed nature
+
+3. Anti-Corruption Layer (Strangler alternative)
+   - Pros: Flexible boundary
+   - Cons: More translation layers, higher latency
+
+## Consequences
+- Pros:
+  * Incremental migration, low risk
+  * Services can be extracted in priority order
+  * Existing consumers see no changes
+  * Can run parallel A/B tests
+  
+- Cons:
+  * Gateway adds latency
+  * Data duplication during migration
+  * Complex eventual consistency
+  * Monitoring more difficult
+
+## Implementation Details
+- Gateway: YARP (low latency, .NET-native)
+- Routing: URL-based (simple, observable)
+- Traffic shifting: Canary deployment (Phase 4)
+- Rollback: Route back to monolith (instant)
+
+## Compliance & Regulatory Notes
+- Audit trail: Correlation ID + Kafka event log
+- Data consistency: Eventual consistency documented (ADR 0006)
+- Bank regulations: No service downtime requirement enforced
+```
+
+---
+
+## Phase 2: Transaction Service Extraction with Event-Driven Communication
+
+### 2.1 Complex Domain with Saga Pattern
+
+**Objective:** Extract Transaction service with multi-step workflows using Saga pattern, handling complex consistency requirements in banking.
+
+#### Step 2.1.1: Transaction Domain Model
+
+**Files to create:**
+- `src/Services/TransactionService/Domain/Transaction.cs` (Aggregate root)
+- `src/Services/TransactionService/Domain/ValueObjects/TransactionId.cs`
+- `src/Services/TransactionService/Domain/Events/TransactionEvents.cs`
+
+**Domain Model:**
+```
+Transaction Aggregate:
+- TransactionId (UUID)
+- SourceAccountId (ref to Account Service)
+- DestinationAccountId (ref to Account Service)
+- Amount (Money value object)
+- Type (Transfer, Withdrawal, Deposit, etc.)
+- Status (Pending, Processing, Completed, Failed, Reversed)
+- CreatedAt
+- CompletedAt
+- FailureReason
+- CorrelationId (for tracking original request)
+- IdempotencyKey (for exactly-once semantics)
+
+Business rules (enforced as domain invariants):
+1. Transaction amount must be positive
+2. Source and destination cannot be same account
+3. Source account must exist in Account Service
+4. Destination account must exist in Account Service
+5. Source account must have sufficient balance
+6. Maximum transaction amount (regulatory limit)
+7. Daily transaction limit (compliance)
+8. Account must not be suspended
+
+Domain Events:
+- TransactionInitiatedEvent
+  - Fired when transaction enters "Pending" state
+  - Triggers saga orchestration
+  
+- TransactionApprovedEvent
+  - Fired when all validations pass
+  - Triggers debit of source account
+  
+- TransactionCompletedEvent
+  - Fired when transaction fully processed
+  - Triggers credit of destination account
+  
+- TransactionFailedEvent
+  - Fired on failure (insufficient funds, service unavailable, etc.)
+  - Triggers compensation (rollback)
+```
+
+### 2.2 Saga Pattern Implementation
+
+**Objective:** Implement distributed transaction coordination across Account Service and Transaction Service.
+
+#### Step 2.2.1: Saga Orchestrator
+
+**Files to create:**
+- `src/Sagas/Transactions/CreateTransactionSaga.cs` - Saga state machine
+- `src/Sagas/Transactions/CreateTransactionSagaState.cs` - Saga state DTO
+- `src/Sagas/Transactions/Steps/ValidateSourceAccountStep.cs` - Individual steps
+
+**Saga Flow for Transaction Processing:**
+
+```
+Orchestration State Machine:
+
+Initial State: Started
+â”‚
+â”œâ”€ Step 1: ValidateSourceAccount
+â”‚  â””â”€ Query AccountService: GET /api/accounts/{sourceAccountId}
+â”‚     â”œâ”€ Success â†’ Step 2
+â”‚     â””â”€ Failure â†’ Saga Failed (compensate: mark transaction as failed)
+â”‚
+â”œâ”€ Step 2: ValidateDestinationAccount
+â”‚  â””â”€ Query AccountService: GET /api/accounts/{destinationAccountId}
+â”‚     â”œâ”€ Success â†’ Step 3
+â”‚     â””â”€ Failure â†’ Saga Failed (compensate)
+â”‚
+â”œâ”€ Step 3: ReserveSourceAccountBalance
+â”‚  â””â”€ Command AccountService: PUT /api/accounts/{sourceAccountId}/reserve
+â”‚     Request body: { "amount": 100.00, "transactionId": "tx-123" }
+â”‚     â”œâ”€ Success (balance reserved) â†’ Step 4
+â”‚     â””â”€ Failure (insufficient funds) â†’ Saga Failed
+â”‚        Compensation: None (no state changed yet)
+â”‚
+â”œâ”€ Step 4: InitiateTransfer
+â”‚  â””â”€ Command TransactionService: PUT /api/transactions/{transactionId}/initiate
+â”‚     â”œâ”€ Success â†’ Step 5
+â”‚     â””â”€ Failure â†’ Saga Failed
+â”‚        Compensation: ReleaseSourceAccountBalance
+â”‚
+â”œâ”€ Step 5: DebitSourceAccount
+â”‚  â””â”€ Command AccountService: PUT /api/accounts/{sourceAccountId}/debit
+â”‚     â”œâ”€ Success â†’ Step 6
+â”‚     â””â”€ Failure â†’ Saga Failed
+â”‚        Compensation: 
+â”‚        1. ReleaseSourceAccountBalance
+â”‚        2. RollbackTransaction (mark as failed)
+â”‚
+â”œâ”€ Step 6: CreditDestinationAccount
+â”‚  â””â”€ Command AccountService: PUT /api/accounts/{destinationAccountId}/credit
+â”‚     â”œâ”€ Success â†’ Step 7
+â”‚     â””â”€ Failure â†’ Saga Failed
+â”‚        Compensation:
+â”‚        1. ReverseSourceAccountDebit
+â”‚        2. RollbackTransaction
+â”‚
+â””â”€ Step 7: CompleteTransaction
+   â””â”€ Command TransactionService: PUT /api/transactions/{transactionId}/complete
+      â”œâ”€ Success â†’ Saga Completed
+      â””â”€ Failure â†’ Saga Failed
+         Compensation: Reverse all previous steps
+```
+
+**Saga Implementation Details:**
+
+```csharp
+public class CreateTransactionSaga : StateMachine<CreateTransactionSagaState>
+{
+    // Define states
+    public State Started { get; private set; }
+    public State SourceAccountValidated { get; private set; }
+    public State DestinationAccountValidated { get; private set; }
+    public State BalanceReserved { get; private set; }
+    public State TransferInitiated { get; private set; }
+    public State SourceDebited { get; private set; }
+    public State DestinationCredited { get; private set; }
+    public State TransactionCompleted { get; private set; }
+    public State Failed { get; private set; }
+    public State Compensating { get; private set; }
+    
+    // Define events (from Kafka or direct commands)
+    public Event<CreateTransactionCommand> CreateTransactionRequested { get; private set; }
+    public Event<SourceAccountValidatedEvent> SourceAccountValidated { get; private set; }
+    // ... more events
+    
+    // Idempotency: Track correlation ID + step
+    public override void Configure()
+    {
+        // Initially
+        Initially(
+            When(CreateTransactionRequested)
+                .Activity(x => x.OfType<ValidateSourceAccountActivity>())
+                .TransitionTo(SourceAccountValidated)
+        );
+        
+        // From SourceAccountValidated
+        During(SourceAccountValidated,
+            When(SourceAccountValidatedEvent)
+                .Activity(x => x.OfType<ValidateDestinationAccountActivity>())
+                .TransitionTo(DestinationAccountValidated),
+            When(SourceAccountValidationFailedEvent)
+                .Activity(x => x.OfType<CompensationActivity>())
+                .TransitionTo(Failed)
+        );
+        
+        // ... more transitions
+        
+        // Compensation chain for failures
+        During(Failed,
+            When(CompensationCompleted)
+                .Finalize()
+        );
+    }
+}
+
+public class CreateTransactionSagaState : SagaStateMachineInstance
+{
+    public Guid CorrelationId { get; set; }
+    public string CurrentState { get; set; }
+    
+    // Transaction details
+    public Guid TransactionId { get; set; }
+    public Guid SourceAccountId { get; set; }
+    public Guid DestinationAccountId { get; set; }
+    public decimal Amount { get; set; }
+    
+    // Step tracking
+    public Guid? SourceAccountReservationId { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+    
+    // Compensation tracking
+    public bool SourceDebited { get; set; }
+    public bool DestinationCredited { get; set; }
+}
+```
+
+#### Step 2.2.2: Activity Implementations
+
+**Files to create:**
+- `src/Sagas/Transactions/Activities/ValidateSourceAccountActivity.cs`
+- `src/Sagas/Transactions/Activities/ReserveSourceBalanceActivity.cs`
+- `src/Sagas/Transactions/Activities/CompensationActivity.cs`
+
+**Activity Pattern:**
+
+```csharp
+public class ValidateSourceAccountActivity : Activity<CreateTransactionSagaState, SourceAccountValidatedEvent>
+{
+    private readonly IAccountServiceClient _accountServiceClient;
+    private readonly ILogger<ValidateSourceAccountActivity> _logger;
+    
+    public async Task<CompensationResult<CreateTransactionSagaState>> Compensate(
+        CompensationContext<CreateTransactionSagaState> context)
+    {
+        // No compensation needed for validation-only step
+        return context.Compensated();
+    }
+    
+    public async Task Execute(
+        ExecuteContext<CreateTransactionSagaState, SourceAccountValidatedEvent> context)
+    {
+        try
+        {
+            var sourceAccount = await _accountServiceClient.GetAccountAsync(
+                context.Instance.SourceAccountId,
+                context.Instance.CorrelationId);
+                
+            if (sourceAccount == null)
+                throw new AccountNotFoundException($"Source account {context.Instance.SourceAccountId} not found");
+            
+            // Publish event for saga to continue
+            await context.Publish(new SourceAccountValidatedEvent
+            {
+                CorrelationId = context.Instance.CorrelationId,
+                AccountId = sourceAccount.Id,
+                Balance = sourceAccount.Balance
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Source account validation failed for transaction {TransactionId}", 
+                context.Instance.TransactionId);
+                
+            await context.Publish(new SourceAccountValidationFailedEvent
+            {
+                CorrelationId = context.Instance.CorrelationId,
+                Reason = ex.Message
+            });
+        }
+    }
+}
+```
+
+#### Step 2.2.3: Orchestrator Hosting
+
+**Files to create:**
+- `src/Services/TransactionService/Infrastructure/Sagas/SagaConfiguration.cs`
+- `src/Services/TransactionService/Infrastructure/Sagas/SagaStatePersistence.cs`
+
+**Configuration:**
+
+```csharp
+public static class SagaConfiguration
+{
+    public static void AddTransactionSagas(this IServiceCollection services)
+    {
+        services.AddMassTransit(x =>
+        {
+            // Register saga
+            x.AddSagaStateMachine<CreateTransactionSaga, CreateTransactionSagaState>()
+                .InMemoryRepository(); // Or EntityFrameworkRepository for durability
+            
+            // Consumer message routing
+            x.AddBus(provider => Bus.Factory.CreateUsingRabbitMq(cfg =>
+            {
+                cfg.Host("rabbitmq://localhost");
+                
+                // Define saga correlation IDs
+                cfg.ReceiveEndpoint("create-transaction-saga", e =>
+                {
+                    e.ConfigureSaga<CreateTransactionSagaState>(provider);
+                });
+            }));
+        });
+    }
+}
+
+// For persistence (critical for reliability in banking):
+// Use EntityFrameworkSagaRepository to persist saga state to database
+// Ensures saga can be resumed even if orchestrator crashes
+public class SagaStatePersistence
+{
+    public DbSet<CreateTransactionSagaState> TransactionSagas { get; set; }
+}
+```
+
+### 2.3 Event Contracts & Versioning
+
+#### Step 2.3.1: Event Schema Definition
+
+**Files to create:**
+- `docs/EVENT_CONTRACTS.md`
+- `src/Shared/Events/TransactionEventContracts.cs`
+
+**Event Versioning Strategy:**
+
+```
+Event format:
+{
+  "messageId": "msg-uuid",
+  "eventId": "evt-uuid",
+  "eventType": "TransactionInitiated",
+  "version": "1.0",
+  "aggregateId": "transaction-123",
+  "aggregateType": "Transaction",
+  "timestamp": "2026-06-14T10:00:00Z",
+  "source": "TransactionService",
+  
+  // Critical for observability
+  "correlationId": "request-456",
+  "causationId": "command-789",
+  "userId": "user-123",
+  
+  // Event-specific data
+  "data": {
+    "transactionId": "transaction-123",
+    "sourceAccountId": "account-456",
+    "destinationAccountId": "account-789",
+    "amount": 100.00,
+    "currency": "EUR",
+    "transactionType": "Transfer"
+  }
+}
+
+Versioning strategy:
+- Current version: 1.0
+- Future version: 2.0 (if fields removed or renamed)
+
+Backward compatibility:
+- Add new fields at root level (optional with defaults)
+- Never remove fields (deprecated fields marked with @deprecated)
+- Consumers must handle unknown fields gracefully
+
+Example upgrade path:
+Version 1.0 â†’ 1.1 (backward compatible):
+  Added: "description" field (optional, defaults to "")
+  
+Version 1.1 â†’ 2.0 (breaking):
+  Removed: "data" nested structure
+  Added: fields at root level (transactionId, sourceAccountId, etc.)
+  Migration: Consumers must handle both v1.1 and v2.0
+  Rollback period: 3 months support for v1.1
+
+Consumer responsibilities:
+- Handle missing optional fields
+- Validate required fields
+- Log unknown fields (don't fail)
+- Track version in metrics
+```
+
+#### Step 2.3.2: Event Publishing Guarantees
+
+**Files to create:**
+- `src/Services/TransactionService/Infrastructure/Outbox/OutboxEntry.cs`
+- `src/Services/TransactionService/Infrastructure/Outbox/OutboxPublisher.cs`
+
+**At-Least-Once Delivery Pattern:**
+
+```
+Problem: Service publishes event to Kafka, then crashes before committing.
+Solution: Outbox pattern (also called transactional outbox)
+
+Implementation:
+1. Save domain event to Outbox table (same transaction as domain state)
+2. Commit transaction (both outbox entry and domain state in DB)
+3. Separate background process polls Outbox
+4. Publishes entries to Kafka
+5. Marks entry as published
+6. If Kafka publish fails, entry remains in Outbox (retry later)
+
+Database schema:
+CREATE TABLE Outbox (
+    Id BIGINT PRIMARY KEY IDENTITY,
+    AggregateId GUID NOT NULL,
+    EventType NVARCHAR(255) NOT NULL,
+    EventData NVARCHAR(MAX) NOT NULL,  -- JSON
+    CreatedAt DATETIME2 NOT NULL,
+    PublishedAt DATETIME2 NULL,  -- NULL until published
+    Attempts INT DEFAULT 0
+);
+
+Background process (OutboxPublisher):
+- Query: SELECT * FROM Outbox WHERE PublishedAt IS NULL ORDER BY CreatedAt
+- For each entry:
+  * Publish to Kafka
+  * If success: UPDATE Outbox SET PublishedAt = NOW()
+  * If failure: Increment Attempts, retry exponentially
+
+Guarantees:
+- At-least-once delivery (Kafka sees events multiple times possible)
+- Exactly-once processing by consumers (requires idempotency keys)
+- No lost events (stored in DB)
+- Works even if service crashes
+```
+
+### 2.4 Resilience Patterns for Banking
+
+#### Step 2.4.1: Banking-Specific Resilience
+
+**Files to create:**
+- `docs/RESILIENCE_PATTERNS.md`
+- `src/Shared/Resilience/BankingSpecificPolicies.cs`
+
+**Pattern 1: Immediate Reversal**
+
+```csharp
+// Pattern: Immediate Reversal for Failed Transactions
+// Use case: Transaction failed at step 5 (debit source account failed)
+// Action: Immediately reverse step 4 (initiate transfer)
+
+public class ImmediateReversalPolicy
+{
+    public async Task HandleFailureAsync(
+        FailureContext context,
+        Step previousStep)
+    {
+        if (context.Exception is InsufficientFundsException)
+        {
+            // Money never left account, no reversal needed
+            return;
+        }
+        
+        // Account was debited, must credit back immediately
+        if (previousStep.Type == StepType.Debit)
+        {
+            await accountService.CreditAsync(
+                accountId: context.SourceAccountId,
+                amount: context.Amount,
+                reason: "Transaction reversal due to " + context.Exception.Message,
+                originalTransactionId: context.TransactionId);
+            
+            // Mark transaction as reverted in database
+            await transactionService.MarkRevertedAsync(context.TransactionId);
+        }
+    }
+}
+```
+
+**Pattern 2: Retry with Exponential Backoff & Jitter**
+
+```csharp
+// Pattern: Retry with Exponential Backoff for Transient Failures
+// Use case: Account Service temporarily unavailable (503)
+// Action: Retry up to 3 times with exponential backoff
+
+var policy = Policy.Handle<HttpRequestException>()
+    .Or<OperationCanceledException>()
+    .OrResult<HttpResponseMessage>(r => r.StatusCode == HttpStatusCode.ServiceUnavailable)
+    .WaitAndRetryAsync(
+        retryCount: 3,
+        sleepDurationProvider: attempt => TimeSpan.FromMilliseconds(
+            100 * Math.Pow(2, attempt - 1) +  // Exponential: 100ms, 200ms, 400ms
+            Random.Next(0, 50)  // Jitter: 0-50ms
+        ),
+        onRetry: (outcome, timespan, attempt, context) =>
+        {
+            logger.LogWarning(
+                "Retry attempt {Attempt} after {Delay}ms for transactionId={TransactionId}",
+                attempt, timespan.TotalMilliseconds, context["transactionId"]);
+        });
+```
+
+**Pattern 3: Circuit Breaker with Banking Thresholds**
+
+```csharp
+// Pattern: Circuit Breaker to Prevent Cascading Failures
+// Use case: Account Service down for extended period
+// Action: Stop sending requests, fail fast with cached response or error
+
+var circuitBreakerPolicy = Policy.Handle<HttpRequestException>()
+    .OrResult<HttpResponseMessage>(r => !r.IsSuccessStatusCode)
+    .CircuitBreakerAsync(
+        handledEventsAllowedBeforeBreaking: 5,  // Fail 5 times then open circuit
+        durationOfBreak: TimeSpan.FromSeconds(30),  // Wait 30s before retrying
+        onBreak: async (outcome, duration, context) =>
+        {
+            logger.LogCritical(
+                "Circuit breaker opened for AccountService. " +
+                "Will retry after {Duration}s. Last error: {Error}",
+                duration.TotalSeconds, outcome.Exception?.Message);
+            
+            // Notify operations team
+            await alertingService.SendAlertAsync(
+                severity: AlertSeverity.Critical,
+                message: "Account Service circuit breaker opened");
+        },
+        onReset: async (context) =>
+        {
+            logger.LogInformation("Circuit breaker closed for AccountService");
+            await alertingService.SendAlertAsync(
+                severity: AlertSeverity.Info,
+                message: "Account Service circuit breaker closed");
+        });
+```
+
+**Pattern 4: Idempotency Keys for Exactly-Once Processing**
+
+```csharp
+// Pattern: Idempotency Keys to Prevent Duplicate Transactions
+// Use case: Client retries transaction after timeout (doesn't know if first request succeeded)
+// Action: Server remembers idempotency key, returns cached result on retry
+
+public class IdempotencyMiddleware
+{
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // Check Idempotency-Key header
+        if (context.Request.Headers.TryGetValue("Idempotency-Key", out var idempotencyKey))
+        {
+            var cachedResponse = await idempotencyStore.GetAsync(idempotencyKey);
+            if (cachedResponse != null)
+            {
+                // Return cached response (same status, same body)
+                context.Response.StatusCode = cachedResponse.StatusCode;
+                await context.Response.WriteAsJsonAsync(cachedResponse.Body);
+                return;
+            }
+        }
+        
+        // Execute request normally
+        var originalBody = context.Response.Body;
+        using var memoryStream = new MemoryStream();
+        context.Response.Body = memoryStream;
+        
+        await next(context);
+        
+        // Cache the response
+        memoryStream.Position = 0;
+        var responseBody = await new StreamReader(memoryStream).ReadToEndAsync();
+        
+        if (idempotencyKey != StringValues.Empty)
+        {
+            await idempotencyStore.SetAsync(
+                idempotencyKey,
+                new IdempotencyEntry
+                {
+                    StatusCode = context.Response.StatusCode,
+                    Body = responseBody,
+                    CreatedAt = DateTime.UtcNow
+                },
+                expirationTime: TimeSpan.FromHours(24));  // Banking requirement: 24h minimum
+        }
+        
+        // Return response
+        memoryStream.Position = 0;
+        await memoryStream.CopyToAsync(originalBody);
+    }
+}
+```
+
+**Pattern 5: Dead Letter Queues for Failed Messages**
+
+```csharp
+// Pattern: Dead Letter Queues to Capture Unprocessable Messages
+// Use case: Event published but no consumer can process it (event version unknown)
+// Action: Move to DLQ for manual inspection
+
+public class DeadLetterQueueHandler
+{
+    public async Task HandleFailedMessageAsync(
+        FailedMessage failedMessage)
+    {
+        // Publish to DLQ topic
+        await kafkaProducer.ProduceAsync(
+            topic: "dead-letter-queue",
+            value: new
+            {
+                originalTopic = failedMessage.Topic,
+                originalPartition = failedMessage.Partition,
+                originalOffset = failedMessage.Offset,
+                originalMessageKey = failedMessage.Key,
+                originalMessageValue = failedMessage.Value,
+                error = failedMessage.Exception.Message,
+                timestamp = DateTime.UtcNow,
+                attempts = failedMessage.Attempts
+            });
+        
+        // Alert operations team
+        await alertingService.SendAlertAsync(
+            severity: AlertSeverity.Warning,
+            message: $"Message moved to DLQ from {failedMessage.Topic}",
+            details: failedMessage.Exception.Message);
+    }
+}
+```
+
+### 2.5 Testing Saga Workflows
+
+**Files to create:**
+- `tests/FinBank.Saga.Tests/CreateTransactionSagaTests.cs`
+- `tests/FinBank.Integration.Tests/TransactionFlowTests.cs`
+
+**Saga Testing Strategy:**
+
+```csharp
+[Fact]
+public async Task CreateTransactionSaga_HappyPath_CompletesSuccessfully()
+{
+    var harness = new InMemoryTestHarness();
+    var sagaHarness = harness.Saga<CreateTransactionSagaState>(
+        new CreateTransactionSagaDefinition());
+    
+    await harness.Start();
+    try
+    {
+        var transactionId = Guid.NewGuid();
+        var correlationId = Guid.NewGuid();
+        
+        // Start saga
+        await harness.Bus.Publish(new CreateTransactionCommand
+        {
+            TransactionId = transactionId,
+            CorrelationId = correlationId,
+            SourceAccountId = Guid.NewGuid(),
+            DestinationAccountId = Guid.NewGuid(),
+            Amount = 100.00m
+        });
+        
+        // Publish succeeding events
+        await harness.Bus.Publish(new SourceAccountValidatedEvent
+        {
+            CorrelationId = correlationId,
+            AccountId = /* ... */
+        });
+        
+        // ... more events
+        
+        // Assert saga completed
+        Assert.True(await sagaHarness.Consumed.Any<TransactionCompletedEvent>());
+        var sagaInstance = sagaHarness.Created.Contains(correlationId);
+        Assert.NotNull(sagaInstance);
+        Assert.Equal("Completed", sagaInstance.CurrentState);
+    }
+    finally
+    {
+        await harness.Stop();
+    }
+}
+
+[Fact]
+public async Task CreateTransactionSaga_InsufficientFunds_Compensates()
+{
+    // Similar setup as above
+    
+    // Publish failure event
+    await harness.Bus.Publish(new InsufficientFundsEvent
+    {
+        CorrelationId = correlationId,
+        AccountId = sourceAccountId,
+        RequestedAmount = 1000.00m,
+        AvailableBalance = 100.00m
+    });
+    
+    // Assert saga failed and compensated
+    Assert.True(await sagaHarness.Consumed.Any<CompensationStartedEvent>());
+    var sagaInstance = sagaHarness.Created.Contains(correlationId);
+    Assert.Equal("Failed", sagaInstance.CurrentState);
+}
+```
+
+---
+
+## Phase 3: Event-Driven Communication & Consistency
+
+### 3.1 Event Streaming Architecture
+
+**Objective:** Establish robust event publishing and consumption patterns across services.
+
+#### Step 3.1.1: Kafka Topic Design
+
+**Files to create:**
+- `infrastructure/kafka/topic-configuration.yaml`
+- `src/Shared/Events/TopicConfiguration.cs`
+
+**Topic Strategy:**
+
+```
+Topic: account-events (Primary Account Stream)
+- Partitions: 10 (parallelism across 10 transaction services)
+- Replication Factor: 3 (HA: lose up to 2 brokers)
+- Retention: 7 days (regulatory audit trail)
+- Compression: Snappy (good balance of speed/size)
+
+Topic: transaction-events (Primary Transaction Stream)
+- Partitions: 20 (higher parallelism)
+- Replication Factor: 3
+- Retention: 14 days (longer audit requirement)
+
+Topic: dead-letter-queue (Failed Messages)
+- Partitions: 3 (lower throughput expected)
+- Retention: 30 days (for investigation)
+
+Topic: audit-log (Compliance Log)
+- Partitions: 1 (strict ordering for compliance)
+- Retention: 7 years (regulatory requirement)
+- Compression: None (audit integrity)
+
+Consumer Group Strategy:
+- account-service-transactions: Subscribes to account-events
+- transaction-service-accounts: Subscribes to account-events
+- notification-service-all: Subscribes to all event topics
+- audit-service: Subscribes to all events (archival)
+```
+
+#### Step 3.1.2: Event Consumption Patterns
+
+**Files to create:**
+- `src/Services/TransactionService/Infrastructure/EventConsumers/AccountEventConsumer.cs`
+- `src/Services/TransactionService/Infrastructure/EventConsumers/EventConsumerConfiguration.cs`
+
+**Consumption Pattern:**
+
+```csharp
+public class AccountEventConsumer : IConsumer<AccountCreatedEvent>
+{
+    private readonly ITransactionRepository _repository;
+    private readonly ILogger<AccountEventConsumer> _logger;
+    
+    public async Task Consume(ConsumeContext<AccountCreatedEvent> context)
+    {
+        var @event = context.Message;
+        
+        // Idempotency: Check if we've processed this event before
+        var processedEvent = await _repository.GetProcessedEventAsync(
+            @event.EventId, 
+            @event.AggregateId);
+            
+        if (processedEvent != null)
+        {
+            _logger.LogInformation(
+                "Event already processed: {EventId}. Skipping.",
+                @event.EventId);
+            return;  // Idempotent (no-op if already processed)
+        }
+        
+        try
+        {
+            // Update local state based on event
+            await _repository.RegisterNewAccountAsync(
+                @event.AccountId,
+                @event.CustomerId,
+                @event.AccountType,
+                @event.Currency);
+            
+            // Mark event as processed
+            await _repository.MarkEventProcessedAsync(@event.EventId, @event.AggregateId);
+            
+            _logger.LogInformation(
+                "Account {AccountId} registered in TransactionService. CorrelationId={CorrelationId}",
+                @event.AccountId, @event.CorrelationId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Failed to process AccountCreatedEvent {EventId}. " +
+                "Message will be retried.",
+                @event.EventId);
+            
+            // Throwing exception causes MassTransit to retry
+            throw;
+        }
+    }
+}
+
+public class EventConsumerConfiguration
+{
+    public static void AddEventConsumers(this IServiceCollection services)
+    {
+        services.AddMassTransit(x =>
+        {
+            x.AddConsumer<AccountEventConsumer>();
+            x.AddConsumer<AccountSuspendedEventConsumer>();
+            
+            x.AddBus(provider => Bus.Factory.CreateUsingKafka((cfg, k) =>
+            {
+                k.Host(kafkaSettings.BootstrapServers);
+                
+                cfg.ReceiveEndpoint("transaction-service-account-events", e =>
+                {
+                    e.ConfigureConsumer<AccountEventConsumer>(provider);
+                    
+                    // Retry policy
+                    e.UseDelayedRedelivery(r => r.Intervals(100, 1000, 5000));
+                    
+                    // Dead letter queue
+                    e.UseInMemoryOutbox();
+                });
+            }));
+        });
+    }
+}
+```
+
+### 3.2 Consistency Guarantees
+
+#### Step 3.2.1: Eventual Consistency Documentation
+
+**Files to create:**
+- `docs/ADR/0006-eventual-consistency.md`
+
+**Consistency Models Explained:**
+
+```
+Model 1: Strong Consistency (Not used in this system)
+- All services always see same data
+- Impossible in distributed systems without sacrificing availability
+- Not suitable for banking with high availability requirements
+
+Model 2: Eventual Consistency (Primary pattern)
+- Services see different data temporarily
+- Given no new updates, all services converge to same state
+- Banking implication: Customer account balance might be slightly out of sync
+  between Account Service and Transaction Service for <5 seconds
+- Acceptable because: No money is lost, regulations allow eventual consistency
+  for non-critical operations
+
+Model 3: Causal Consistency (For critical operations)
+- Events are processed in causal order (if E1 caused E2, E2 processed after E1)
+- Implemented via: Saga pattern with explicit ordering
+- Example: TransactionInitiated must be processed before TransactionCompleted
+
+Guarantee for this system:
+1. Within a single aggregate (Account, Transaction): Strong consistency
+   - Database ACID guarantees
+   - Single writer principle
+   
+2. Between aggregates (Account + Transaction consistency):
+   Eventual consistency via Saga
+   - Saga ensures logical ordering
+   - Both accounts eventually reconcile
+   - Worst case: 5 second lag
+   
+3. For fraud detection, audit logging:
+   Strict ordering via single-partition topic
+   - Topic with 1 partition guarantees order
+   - Slightly lower throughput but strict compliance
+```
+
+### 3.3 Read Model / Projections
+
+**Objective:** Maintain read-optimized views of data for reporting and queries.
+
+**Files to create:**
+- `src/Services/TransactionService/Infrastructure/Projections/TransactionProjection.cs`
+- `src/Services/TransactionService/Infrastructure/Projections/ProjectionDbContext.cs`
+
+**Projection Pattern:**
+
+```csharp
+public class TransactionProjection
+{
+    // Denormalized view, optimized for queries
+    public Guid TransactionId { get; set; }
+    public Guid SourceAccountId { get; set; }
+    public Guid DestinationAccountId { get; set; }
+    public string SourceAccountNumber { get; set; }  // Denormalized from Account Service
+    public string DestinationAccountNumber { get; set; }
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    public string Status { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? CompletedAt { get; set; }
+}
+
+public class TransactionProjectionHandler :
+    IConsumer<TransactionInitiatedEvent>,
+    IConsumer<TransactionCompletedEvent>,
+    IConsumer<TransactionFailedEvent>
+{
+    private readonly IProjectionRepository _repository;
+    
+    public async Task Consume(ConsumeContext<TransactionInitiatedEvent> context)
+    {
+        var @event = context.Message;
+        
+        // Create initial projection
+        var projection = new TransactionProjection
+        {
+            TransactionId = @event.TransactionId,
+            SourceAccountId = @event.SourceAccountId,
+            DestinationAccountId = @event.DestinationAccountId,
+            Amount = @event.Amount,
+            Currency = @event.Currency,
+            Status = "Pending",
+            CreatedAt = @event.Timestamp
+        };
+        
+        await _repository.CreateProjectionAsync(projection);
+    }
+    
+    public async Task Consume(ConsumeContext<TransactionCompletedEvent> context)
+    {
+        var @event = context.Message;
+        
+        // Update projection
+        var projection = await _repository.GetByIdAsync(@event.TransactionId);
+        projection.Status = "Completed";
+        projection.CompletedAt = @event.Timestamp;
+        
+        await _repository.UpdateProjectionAsync(projection);
+    }
+}
+
+// Query usage
+public class GetTransactionHistoryQueryHandler : IRequestHandler<GetTransactionHistoryQuery>
+{
+    private readonly IProjectionRepository _repository;
+    
+    public async Task<List<TransactionProjection>> Handle(GetTransactionHistoryQuery request)
+    {
+        return await _repository
+            .Where(p => p.SourceAccountId == request.AccountId || 
+                        p.DestinationAccountId == request.AccountId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+    }
+}
+```
+
+---
+
+## Phase 4: Complete Observability Implementation
+
+### 4.1 OpenTelemetry Integration
+
+**Files to create:**
+- `src/Shared/Observability/OTelConfiguration.cs`
+- `src/Shared/Observability/InstrumentationExtensions.cs`
+
+**OTel Setup:**
+
+```csharp
+public static class OTelConfiguration
+{
+    public static void AddOpenTelemetry(this IServiceCollection services)
+    {
+        services
+            .AddOpenTelemetry()
+            .ConfigureResource(resource => resource
+                .AddService(
+                    serviceName: "finbank",
+                    serviceVersion: typeof(Program).Assembly.GetName().Version?.ToString()))
+            .WithTracing(tracing => tracing
+                // Exporter: Jaeger
+                .AddJaegerExporter(options =>
+                {
+                    options.AgentHost = "localhost";
+                    options.AgentPort = 6831;
+                })
+                
+                // Automatic instrumentations
+                .AddAspNetCoreInstrumentation(options =>
+                {
+                    // Record all HTTP requests
+                    options.RecordException = true;
+                    options.EnrichWithHttpRequest = (activity, request) =>
+                    {
+                        // Add correlation ID to trace
+                        activity?.SetTag("correlation_id", 
+                            request.Headers["X-Correlation-ID"]);
+                    };
+                })
+                .AddHttpClientInstrumentation(options =>
+                {
+                    // Record outbound HTTP calls
+                    options.RecordException = true;
+                    options.EnrichWithHttpRequestMessage = (activity, request) =>
+                    {
+                        // Trace HTTP calls to Account Service
+                        activity?.SetTag("http.url_full", request.RequestUri?.ToString());
+                    };
+                })
+                .AddEntityFrameworkCoreInstrumentation(options =>
+                {
+                    // Record database queries
+                    options.SetDbStatementForText = true;
+                })
+                
+                // Custom instrumentations
+                .AddSource("MassTransit")  // Message bus events
+                .AddSource("FinBank.*")     // Our domain events
+            )
+            .WithMetrics(metrics => metrics
+                // Exporter: Prometheus
+                .AddPrometheusExporter()
+                
+                // Automatic instrumentations
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddRuntimeInstrumentation()
+                .AddProcessInstrumentation()
+                
+                // Custom metrics
+                .AddMeter("FinBank.Transactions", "FinBank.Accounts")
+            )
+            .WithLogging(logging => logging
+                .AddOtlpExporter()  // Send logs to Loki
+            );
+    }
+}
+
+// Usage in application
+public class CreateAccountCommandHandler
+{
+    private readonly ActivitySource _activitySource;
+    private readonly Meter _meter;
+    
+    public CreateAccountCommandHandler()
+    {
+        _activitySource = new ActivitySource("FinBank.Accounts");
+        _meter = new Meter("FinBank.Accounts");
+    }
+    
+    public async Task<CreateAccountResponse> Handle(CreateAccountCommand command)
+    {
+        using var activity = _activitySource.StartActivity("CreateAccount");
+        
+        // Tag activity with business context
+        activity?.SetTag("customer_id", command.CustomerId);
+        activity?.SetTag("account_type", command.AccountType);
+        activity?.SetTag("amount", command.InitialBalance);
+        
+        try
+        {
+            // Business logic
+            var account = await _repository.CreateAsync(command);
+            
+            activity?.SetTag("account_id", account.Id);
+            activity?.SetTag("status", "success");
+            
+            return new CreateAccountResponse { Id = account.Id };
+        }
+        catch (Exception ex)
+        {
+            activity?.SetTag("status", "error");
+            activity?.RecordException(ex);
+            throw;
+        }
+    }
+}
+```
+
+### 4.2 Distributed Tracing Setup
+
+**Files to create:**
+- `monitoring/jaeger/jaeger-config.yml`
+- `docs/OBSERVABILITY.md`
+
+**Trace Propagation Across Services:**
+
+```
+Request flow with trace IDs:
+
+Client Request:
+GET /api/accounts/123
+Headers:
+  X-Correlation-ID: corr-req-abc-123
+  traceparent: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
+
+         â”‚
+         â–¼
+    API Gateway (YARP)
+         â”‚
+         â”œâ”€ Extract traceparent header (W3C standard)
+         â”œâ”€ Propagate to Account Service
+         â”‚
+         â””â”€ Create span: "gateway.reverse_proxy"
+            - tag: gateway.request_size
+            - tag: gateway.latency_ms
+            â”‚
+            â””â”€ Create child span: "account_service.http_request"
+               - tag: http.method: GET
+               - tag: http.target: /api/accounts/123
+               - tag: peer.service: account-service
+               â”‚
+               â””â”€ Account Service receives request
+                  â”‚
+                  â”œâ”€ Extract W3C traceparent
+                  â”œâ”€ Create span: "account_repository.get"
+                  â”‚  - tag: db.system: postgresql
+                  â”‚  - tag: db.statement: SELECT * FROM accounts WHERE id = @id
+                  â”‚  - tag: db.rows_affected: 1
+                  â”‚
+                  â””â”€ Create span: "kafka.produce"
+                     - tag: messaging.system: kafka
+                     - tag: messaging.destination: account-events
+                     - tag: messaging.message_id: msg-123
+
+All spans share same trace ID:
+0af7651916cd43dd8448eb211c80319c
+
+This allows Jaeger to reconstruct full request flow visually
+```
+
+### 4.3 Metrics & Dashboards
+
+**Files to create:**
+- `monitoring/prometheus/prometheus.yml`
+- `monitoring/grafana/dashboards/service-health.json`
+- `monitoring/grafana/dashboards/transaction-flow.json`
+
+**Key Metrics:**
+
+```yaml
+Prometheus metrics to collect:
+
+# Application metrics
+finbank_accounts_created_total
+  - Label: currency
+  - Label: account_type
+  
+finbank_transactions_initiated_total
+  - Label: status (pending/completed/failed)
+  - Label: transaction_type
+
+finbank_transaction_latency_ms
+  - Histogram: p50, p95, p99
+  - Labels: service, operation
+
+finbank_saga_execution_duration_ms
+  - Histogram: time from initiation to completion
+  - Labels: saga_type, status (completed/failed)
+
+# Infrastructure metrics
+finbank_kafka_messages_produced_total
+  - Label: topic
+  - Label: status (success/failure)
+
+finbank_kafka_consumer_lag
+  - Gauge: messages behind
+  - Label: consumer_group
+  - Label: topic
+
+finbank_database_query_duration_ms
+  - Histogram: query execution time
+  - Label: query_type (select/insert/update/delete)
+
+finbank_http_requests_total
+  - Counter: all HTTP requests
+  - Label: method, endpoint, status_code
+
+finbank_circuit_breaker_status
+  - Gauge: 0=closed, 1=open, 2=half-open
+  - Label: service_name
+
+# Custom banking metrics
+finbank_account_balance_total
+  - Gauge: total balance across system
+  - Label: currency
+  - CRITICAL for reconciliation
+
+finbank_pending_transactions_count
+  - Gauge: transactions in progress
+  - CRITICAL for SLA monitoring
+
+finbank_compensation_events_total
+  - Counter: saga compensations executed
+  - Label: saga_type, reason
+```
+
+**Grafana Dashboards:**
+
+```json
+Dashboard 1: Service Health
+- Panels:
+  * Service availability (uptime %)
+  * HTTP error rate
+  * P99 latency
+  * Database connection pool
+  * Kafka consumer lag
+
+Dashboard 2: Transaction Flow
+- Panels:
+  * Transaction success rate
+  * Avg processing time (end-to-end)
+  * Saga compensation rate
+  * Top failure reasons
+  * Account balance trend
+
+Dashboard 3: System Load
+- Panels:
+  * CPU per service
+  * Memory per service
+  * Network I/O
+  * Kafka topic throughput
+  * Database connections
+```
+
+### 4.4 Centralized Logging
+
+**Files to create:**
+- `monitoring/loki/loki-config.yml`
+- `docker-compose.yml` (update with ELK stack)
+
+**Logging Strategy:**
+
+```
+All services log to Loki with labels:
+{
+  "service": "account-service",
+  "environment": "production",
+  "version": "2.1.0",
+  "pod": "account-service-abc123"
+}
+
+Log aggregation queries:
+- {service="account-service"} | json | level="error"
+  â†’ All errors from Account Service
+  
+- {service=~".*-service"} | json | status=~"[45].."
+  â†’ All 4xx/5xx errors from all services
+  
+- {service="transaction-service"} | json | event="TransactionFailed"
+  â†’ All failed transactions
+
+Retention policy:
+- Production logs: 30 days
+- Error logs: 90 days
+- Audit logs: 7 years (regulatory)
+```
+
+---
+
+## Phase 5: Documentation & Architectural Decision Records
+
+### 5.1 ADR Template and Complete Set
+
+All ADRs follow this structure:
+
+**Files to create:**
+- `docs/ADR/0005-saga-pattern-orchestration.md`
+- `docs/ADR/0007-banking-regulatory-compliance.md`
+- `docs/ADR/0008-distributed-tracing-strategy.md`
+- `docs/ADR/0009-service-versioning.md`
+- `docs/ADR/0010-dead-letter-queues.md`
+- `docs/ADR/0011-canary-deployment-strategy.md`
+
+**ADR 0005 Example:**
+
+```markdown
+# ADR 0005: Saga Pattern Orchestration
+
+## Status
+Accepted
+
+## Context
+Need to maintain consistency across Account and Transaction services during
+transaction processing. Two options: choreography vs orchestration.
+
+Choreography: Services publish events, other services consume and react
+- Pros: Decoupled, no central coordinator
+- Cons: Complex to follow, no single view of saga state, hard to debug
+
+Orchestration: Central saga orchestrator sends commands to services
+- Pros: Explicit workflow, single source of truth, easy to monitor
+- Cons: Central point of failure, harder to scale
+
+## Decision
+Use hybrid approach:
+- Simple flows (creating account): Use choreography
+- Complex flows (transaction with compensation): Use orchestration
+
+Saga orchestrator implemented using MassTransit StateMachine.
+
+## Consequences
+- Positive: Clear transaction semantics, easier troubleshooting
+- Negative: Extra latency from orchestrator, need to persist saga state
+
+## Compliance Notes
+- Saga state persisted to database (durability required by banking)
+- Compensation logic tested for all failure scenarios (audit trail)
+- Idempotency keys prevent duplicate transactions
+```
+
+### 5.2 Event Contracts Documentation
+
+**Files to create:**
+- `docs/EVENT_CONTRACTS.md`
+
+```markdown
+# Event Contracts Specification
+
+## AccountCreatedEvent (v1.0)
+
+### Purpose
+Emitted when new account created in Account Service.
+Consumers use this to register account in their local databases.
+
+### Schema
+```json
+{
+  "eventId": "string (UUID)",
+  "eventType": "AccountCreated",
+  "version": "1.0",
+  "aggregateId": "string (UUID, AccountId)",
+  "aggregateType": "Account",
+  "timestamp": "string (ISO 8601)",
+  "correlationId": "string (UUID)",
+  "causationId": "string (UUID)",
+  
+  "data": {
+    "accountId": "string (UUID)",
+    "customerId": "string (UUID)",
+    "accountNumber": "string",
+    "iban": "string",
+    "accountType": "string (Checking|Savings|Business)",
+    "currency": "string (ISO 4217, e.g., EUR)",
+    "initialBalance": "number (decimal)"
+  }
+}
+```
+
+### Consumers
+- TransactionService: Registers account for transaction processing
+- NotificationService: Sends welcome email to customer
+- AuditService: Records event for compliance
+
+### Backwards Compatibility
+- Version 1.0: Current stable
+- Future Version 1.1: May add optional fields (all consumers must handle)
+- Future Version 2.0: Breaking changes (3 months deprecation period)
+
+### Idempotency
+Consume must check: `(accountId, eventId)` tuple.
+If duplicate received, skip processing (idempotent).
+```
+
+### 5.3 API Contract Documentation
+
+**Files to create:**
+- `docs/API_CONTRACTS.md`
+
+```markdown
+# HTTP API Contracts
+
+## POST /api/v1/accounts
+
+### Request
+```
+POST /api/v1/accounts
+Content-Type: application/json
+X-Correlation-ID: request-123
+Idempotency-Key: idem-456
+
+{
+  "customerId": "customer-789",
+  "accountType": "Checking",
+  "currency": "EUR",
+  "initialBalance": 1000.00
+}
+```
+
+### Response (201 Created)
+```
+HTTP/1.1 201 Created
+Location: /api/v1/accounts/account-123
+Content-Type: application/json
+
+{
+  "id": "account-123",
+  "accountNumber": "1234567890",
+  "iban": "DE89370400440532013000",
+  "customerId": "customer-789",
+  "accountType": "Checking",
+  "balance": 1000.00,
+  "currency": "EUR",
+  "status": "Active",
+  "createdAt": "2026-06-14T10:00:00Z",
+  "modifiedAt": "2026-06-14T10:00:00Z"
+}
+```
+
+### Error Responses
+```
+400 Bad Request
+{
+  "code": "INVALID_CURRENCY",
+  "message": "Currency XYZ is not supported"
+}
+
+403 Forbidden
+{
+  "code": "CUSTOMER_NOT_AUTHORIZED",
+  "message": "Customer does not have permission to create accounts"
+}
+
+409 Conflict
+{
+  "code": "ACCOUNT_ALREADY_EXISTS",
+  "message": "Account with this customer ID already exists"
+}
+```
+
+### Idempotency
+- Header: `Idempotency-Key: <UUID>`
+- Server caches response for 24 hours
+- Same key + same request body = same response
+- Different request body = 422 Unprocessable Entity
+
+### SLA
+- p99 latency: < 100ms
+- availability: > 99.95%
+```
+
+### 5.4 Architecture Diagram Documentation
+
+**Files to create:**
+- `docs/ARCHITECTURE.md`
+
+Include diagrams for:
+1. **Overall System Architecture** - all services, gateways, data stores
+2. **Transaction Flow Diagram** - happy path and error scenarios
+3. **Saga Compensation Diagram** - failure handling
+4. **Data Flow** - how events propagate
+5. **Deployment Architecture** - Kubernetes layout
+
+---
+
+## Technology Decisions & Alternatives Analysis
+
+### 0A. API Gateway: YARP vs Kong vs Nginx vs Envoy
+
+| Criteria | YARP | Kong | Nginx | Envoy |
+|----------|------|------|-------|-------|
+| Language | C# (.NET) | Lua/Go | C | Go |
+| .NET Integration | Native | Limited | Limited | Limited |
+| Latency | Ultra-low | Low | Ultra-low | Low |
+| Configuration | C# code | YAML/API | nginx.conf | YAML |
+| Features | Basic | Rich (plugins) | Rich | Rich |
+| Learning Curve | Low (.NET devs) | Medium | Medium | High |
+| **Decision** | **Selected** | Alternative | Alternative | Enterprise alternative |
+
+**Rationale:** YARP chosen for native .NET integration, low latency, and easy configuration from C# code. Reduces operational overhead in .NET-heavy organization.
+
+### 0B. Message Broker: Kafka vs RabbitMQ
+
+| Criteria | Kafka | RabbitMQ |
+|----------|-------|----------|
+| Throughput | High (1M msg/sec) | Medium (50K msg/sec) |
+| Latency | Medium (10ms+) | Low (sub-ms) |
+| Durability | Excellent (event log) | Good |
+| Ordering | Per-partition | Per-queue |
+| Compliance | Audit trail built-in | Manual implementation |
+| Operational Complexity | Higher | Lower |
+| .NET Support | Excellent | Excellent |
+| **Decision** | **Selected** | Alternative |
+
+**Rationale:** Kafka selected for immutable event log (critical for banking compliance), topic partitioning (parallelism), and native ordering guarantees. The slightly higher operational complexity is acceptable.
+
+### 0C. Saga Pattern: Orchestration vs Choreography
+
+| Aspect | Orchestration | Choreography |
+|--------|---------------|-------------|
+| Complexity | Medium | High |
+| Visibility | Excellent (single orchestrator) | Poor (distributed logic) |
+| Debugging | Easy | Difficult |
+| Performance | Slightly slower | Slightly faster |
+| Failure Handling | Centralized | Distributed |
+| **Decision** | **Selected (primary)** | Fallback for simple flows |
+
+**Rationale:** Hybrid approach selected. Use orchestration for complex banking workflows (transactions), choreography for simple events (account creation notifications).
+
+### 0D. Database: PostgreSQL vs SQL Server vs MySQL
+
+| Criteria | PostgreSQL | SQL Server | MySQL |
+|----------|-----------|-----------|-------|
+| ACID Compliance | Strict | Strict | Configurable |
+| JSON Support | Excellent | Good | Good |
+| Licensing | Open source | Paid | Open source |
+| .NET Support | Excellent | Native | Good |
+| Operational | Easy | Medium | Easy |
+| **Decision** | **Selected** | For existing orgs | Not recommended |
+
+**Rationale:** PostgreSQL selected for open-source licensing, excellent JSON support (for outbox pattern), and strong ACID guarantees needed for financial data.
+
+---
+
+## Testing & Validation Approach
+
+### Unit Tests
+```
+Coverage target: 80%+ for domain logic, 60%+ for infrastructure
+Framework: xUnit
+Run: Every commit (CI)
+Time: < 2 minutes
+```
+
+### Integration Tests
+```
+Test services with real database + Kafka
+Coverage: Happy path + error scenarios
+Framework: xUnit + MassTransit Test Harness
+Run: Before PR merge
+Time: < 10 minutes
+```
+
+### Contract Tests
+```
+Test HTTP contracts with Pact
+Test event contracts with Avro validation
+Ensures backward compatibility
+Run: Before release
+```
+
+### Load Tests
+```
+Target: 1000 req/sec sustained
+Tool: NBomber
+Metrics: p99 latency < 150ms, error rate < 0.1%
+Run: Weekly in staging
+```
+
+### Chaos Engineering
+```
+Inject failures: Service unavailable, network latency, timeout
+Verify: Saga compensation works, no data loss
+Tools: Chaos Toolkit or Gremlin
+Run: Monthly in production-like environment
+```
+
+---
+
+## Estimated Effort & Dependencies
+
+| Phase | Component | Effort (days) | Dependencies |
+|-------|-----------|---------------|--------------|
+| 0 | Infrastructure setup | 3 | Nothing |
+| 1 | API Gateway (YARP) | 2 | Phase 0 |
+| 1 | Account Service extraction | 5 | Gateway |
+| 1 | Testing & validation | 2 | Account Service |
+| 2 | Transaction Service extraction | 6 | Account Service + Kafka |
+| 2 | Saga orchestrator | 4 | Transaction Service |
+| 2 | Testing & Saga validation | 3 | Saga implementation |
+| 3 | Event-driven communication | 3 | Saga + Kafka |
+| 3 | Read models/projections | 2 | Event consumers |
+| 4 | OpenTelemetry setup | 2 | Nothing |
+| 4 | Distributed tracing | 2 | OTel |
+| 4 | Metrics & dashboards | 3 | OTel + Prometheus + Grafana |
+| 4 | Centralized logging | 2 | Loki |
+| 5 | ADRs documentation | 4 | All previous |
+| 5 | API contracts documentation | 2 | Phase 1-2 |
+| 5 | Architecture diagrams | 2 | All phases |
+| **TOTAL** | | **46 days** | ~9 weeks |
+
+---
+
+## Critical Technical Challenges & Mitigation
+
+### Challenge 1: Data Consistency Across Services
+
+**Problem:** Account service has $100, transaction service thinks $100, but in reality we debit $50. Services out of sync.
+
+**Mitigation:**
+1. Saga pattern ensures steps executed in order
+2. Idempotency keys prevent duplicate executions
+3. Eventual consistency documented and accepted
+4. Daily reconciliation job compares Accountâ†”Transaction balances
+5. Monitoring alerts on imbalance > $0.01
+
+**Implementation:**
+```csharp
+// Daily reconciliation job
+public class AccountTransactionReconciliationJob : IHostedService
+{
+    public async Task ExecuteAsync()
+    {
+        var accountBalances = await accountService.GetAllBalancesAsync();
+        var transactionBalances = await transactionService.GetAllBalancesAsync();
+        
+        var discrepancies = accountBalances
+            .Join(transactionBalances, a => a.AccountId, t => t.AccountId,
+                  (a, t) => new { Account = a, Transaction = t })
+            .Where(x => Math.Abs(x.Account.Balance - x.Transaction.Balance) > 0.01m)
+            .ToList();
+        
+        if (discrepancies.Any())
+        {
+            await alertingService.SendAlertAsync(
+                severity: AlertSeverity.Critical,
+                message: $"{discrepancies.Count} account balance discrepancies detected");
+            
+            // Create reconciliation records for manual review
+            foreach (var discrepancy in discrepancies)
+            {
+                await reconciliationRepository.CreateAsync(
+                    accountId: discrepancy.Account.AccountId,
+                    expectedBalance: discrepancy.Account.Balance,
+                    actualBalance: discrepancy.Transaction.Balance,
+                    difference: discrepancy.Account.Balance - discrepancy.Transaction.Balance);
+            }
+        }
+    }
+}
+```
+
+### Challenge 2: Saga Failure & Compensation Complexity
+
+**Problem:** Transaction saga fails at step 5 (debit source). Must reverse steps 4, 3, 2, 1. If reversal fails, saga stuck forever.
+
+**Mitigation:**
+1. Compensation logic is itself idempotent (can be retried)
+2. Saga state persisted to database (can resume from failure)
+3. Dead letter queue captures unprocessable compensation commands
+4. Manual intervention playbook for stuck sagas
+
+**Implementation:**
+```csharp
+public class SagaCompensationActivity : Activity
+{
+    public async Task<CompensationResult<CreateTransactionSagaState>> Compensate(
+        CompensationContext<CreateTransactionSagaState> context)
+    {
+        // Compensation is idempotent
+        // If called twice, same result
+        
+        // Step 1: Release source account reservation
+        var releaseResult = await accountService.ReleaseReservationAsync(
+            accountId: context.Instance.SourceAccountId,
+            reservationId: context.Instance.SourceAccountReservationId);
+        
+        if (!releaseResult.Success && releaseResult.Error != "ReservationNotFound")
+        {
+            // Retry this step
+            return context.Retry();  // MassTransit retries
+        }
+        
+        // Step 2: Mark transaction as failed
+        await transactionService.MarkFailedAsync(
+            transactionId: context.Instance.TransactionId,
+            reason: "Saga compensation: " + context.Exception?.Message);
+        
+        return context.Compensated();  // Compensation complete
+    }
+}
+```
+
+### Challenge 3: Network Partitions & Service Failures
+
+**Problem:** Account Service is down. Transaction service can't validate accounts. Should fail immediately or retry?
+
+**Mitigation:**
+1. Circuit breaker stops sending requests after 5 failures
+2. Saga fails fast (doesn't wait forever)
+3. Fallback: Use last-known-good data from cache
+4. Manual intervention: Operations team can manually approve transaction
+
+**Implementation:**
+```csharp
+// Circuit breaker + fallback policy
+var policy = Policy.Handle<HttpRequestException>()
+    .OrResult<AccountResponse>(r => r == null)
+    .CircuitBreakerAsync(
+        handledEventsAllowedBeforeBreaking: 5,
+        durationOfBreak: TimeSpan.FromSeconds(30))
+    .WrapAsync(
+        Policy.TimeoutAsync<AccountResponse>(TimeSpan.FromSeconds(5))
+    )
+    .FallbackAsync<AccountResponse>(
+        async (outcome, context) =>
+        {
+            // Fallback: Use cached account data
+            var cachedAccount = await cache.GetAsync(
+                $"account:{context["accountId"]}");
+            return cachedAccount;  // May be stale, but better than failure
+        });
+```
+
+### Challenge 4: Regulatory Compliance & Audit Trails
+
+**Problem:** Bank regulators audit our transactions. Must prove every transaction was processed correctly.
+
+**Mitigation:**
+1. All events stored in Kafka (immutable append-only log)
+2. Correlation IDs tie requests to events
+3. All service calls logged with timestamps
+4. Saga state transitions audited
+5. Annual compliance audits validate log completeness
+
+**Implementation:**
+```csharp
+// Outbox ensures event logged before returning to client
+public class TransactionCommandHandler : IRequestHandler<CreateTransactionCommand>
+{
+    private readonly UnitOfWork _unitOfWork;
+    
+    public async Task<TransactionResponse> Handle(CreateTransactionCommand command)
+    {
+        using var transaction = await _unitOfWork.BeginTransactionAsync();
+        
+        // Create transaction in database
+        var transaction = new Transaction
+        {
+            Id = command.TransactionId,
+            CorrelationId = command.CorrelationId,  // Link to request
+            SourceAccountId = command.SourceAccountId,
+            DestinationAccountId = command.DestinationAccountId,
+            Amount = command.Amount,
+            Status = TransactionStatus.Initiated,
+            CreatedAt = DateTime.UtcNow,
+            CreatedBy = currentUser.Id
+        };
+        await _unitOfWork.Transactions.AddAsync(transaction);
+        
+        // Add event to outbox (same transaction)
+        var @event = new TransactionInitiatedEvent
+        {
+            EventId = Guid.NewGuid(),
+            TransactionId = command.TransactionId,
+            CorrelationId = command.CorrelationId,
+            Timestamp = DateTime.UtcNow
+        };
+        await _unitOfWork.Outbox.AddAsync(@event);
+        
+        // Single atomic commit
+        await _unitOfWork.SaveChangesAsync();  // Commits both transaction + event
+        
+        // Only after commit, return response
+        return new TransactionResponse { Id = transaction.Id };
+        
+        // If service crashes here, event is still in Outbox
+        // Background process will publish it later
+    }
+}
+```
+
+### Challenge 5: Schema Evolution & Versioning
+
+**Problem:** We want to add "description" field to AccountCreatedEvent. Old services don't understand new field.
+
+**Mitigation:**
+1. New fields always optional with defaults
+2. Old services ignore unknown fields (schema-agnostic deserialization)
+3. Separate versioning for breaking changes (v2 endpoint)
+4. Deprecation period: 6 months before removing old versions
+
+**Implementation:**
+```csharp
+// Event deserialization with unknown fields ignored
+public class AccountCreatedEvent
+{
+    [JsonPropertyName("accountId")]
+    public Guid AccountId { get; set; }
+    
+    [JsonPropertyName("customerId")]
+    public Guid CustomerId { get; set; }
+    
+    // New field: optional, defaults to null
+    [JsonPropertyName("description")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? Description { get; set; }
+}
+
+// Deserializer that ignores unknown fields
+var options = new JsonSerializerOptions
+{
+    PropertyNameCaseInsensitive = true,
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    WriteIndented = false
+};
+
+// Unknown fields are silently ignored
+var @event = JsonSerializer.Deserialize<AccountCreatedEvent>(json, options);
+```
+
+---
+
+## File Structure Summary
+
+```
+D:\CURSOS\RETO5\
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ Gateway/                    # API Gateway (YARP)
+â”‚   â”œâ”€â”€ Services/
+â”‚   â”‚   â”œâ”€â”€ AccountService/         # First service extraction
+â”‚   â”‚   â”œâ”€â”€ TransactionService/     # Second service extraction
+â”‚   â”‚   â””â”€â”€ NotificationService/    # Supporting service
+â”‚   â”œâ”€â”€ Sagas/                      # Saga orchestrators
+â”‚   â””â”€â”€ Shared/                     # Shared contracts + utilities
+â”œâ”€â”€ docker-compose.yml              # Local development
+â”œâ”€â”€ docs/
+â”‚   â”œâ”€â”€ ARCHITECTURE.md
+â”‚   â”œâ”€â”€ API_CONTRACTS.md
+â”‚   â”œâ”€â”€ EVENT_CONTRACTS.md
+â”‚   â”œâ”€â”€ RESILIENCE_PATTERNS.md
+â”‚   â”œâ”€â”€ OBSERVABILITY.md
+â”‚   â”œâ”€â”€ ADR/                        # 11 architectural decisions
+â”‚   â””â”€â”€ [diagrams as images]
+â”œâ”€â”€ monitoring/                     # Prometheus, Grafana, Jaeger, Loki configs
+â””â”€â”€ tests/                          # Unit, integration, contract tests
+```
+
+---
+
+## Implementation Sequence (Recommended)
+
+**Week 1-2:** Phase 0 + Phase 1 (Gateway + Account Service)
+- Set up Docker Compose environment
+- Implement YARP gateway
+- Extract Account Service with basic HTTP API
+- Set up Kafka and event publishing
+- Write unit + integration tests
+
+**Week 3-4:** Phase 2 (Transaction Service + Saga)
+- Extract Transaction Service
+- Implement Saga orchestrator
+- Test compensation logic
+- Create load tests
+
+**Week 5:** Phase 3 (Event-Driven + Consistency)
+- Implement event consumers
+- Build read models/projections
+- Validate eventual consistency
+- Create reconciliation jobs
+
+**Week 6:** Phase 4 (Observability)
+- Integrate OpenTelemetry
+- Set up Jaeger + Prometheus + Grafana + Loki
+- Create dashboards
+- Validate trace propagation end-to-end
+
+**Week 7-9:** Phase 5 + Polish
+- Write ADRs and documentation
+- Create architecture diagrams
+- Performance tune (optimize latencies)
+- Security review + hardening
+
+---
+
+# Critical Files for Implementation
+
+The following files are essential to implement this plan:
+
+## Core Infrastructure Files
+- `docker-compose.yml` - Defines Kafka, PostgreSQL, Redis, monitoring stack
+- `src/Gateway/Program.cs` - YARP configuration, route definitions, middleware
+- `src/Shared/Observability/CorrelationIdProvider.cs` - Request tracing foundation
+
+## Account Service (Phase 1)
+- `src/Services/AccountService/Domain/Account.cs` - Aggregate root with invariants
+- `src/Services/AccountService/Infrastructure/Persistence/AccountDbContext.cs` - EF Core DB configuration
+- `src/Services/AccountService/Infrastructure/MessageQueue/KafkaEventPublisher.cs` - Event publishing
+
+## Transaction Service (Phase 2)
+- `src/Services/TransactionService/Domain/Transaction.cs` - Complex transaction aggregate
+- `src/Sagas/Transactions/CreateTransactionSaga.cs` - Saga state machine orchestrator
+- `src/Sagas/Transactions/Activities/ValidateSourceAccountActivity.cs` - Individual saga steps
+
+## Resilience & Observability
+- `src/Shared/Resilience/BankingSpecificPolicies.cs` - Polly policies (circuit breaker, retry, timeout)
+- `src/Shared/Observability/OTelConfiguration.cs` - OpenTelemetry setup
+
+## Documentation Files
+- `docs/ADR/0001-strangler-fig-pattern.md` - Core architectural decision
+- `docs/ADR/0005-saga-pattern-orchestration.md` - Saga pattern justification
+- `docs/ARCHITECTURE.md` - System diagrams and overall design
+- `docs/EVENT_CONTRACTS.md` - Event schema versioning strategy
+- `docs/RESILIENCE_PATTERNS.md` - Banking-specific resilience patterns
+
+These 15 files form the skeleton of the entire microservices migration. All other files build upon these foundations.

@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Evidencias Fase 1 - FinBank Microservices</title>
+    <style>
+        body {
+            font-family: 'Calibri', 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f9f9f9;
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #0078d4;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #0078d4;
+            font-size: 28px;
+            margin: 10px 0;
+        }
+        .header p {
+            color: #666;
+            font-size: 12px;
+            margin: 5px 0;
+        }
+        .section {
+            background-color: white;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid #0078d4;
+            page-break-inside: avoid;
+        }
+        .section h2 {
+            color: #0078d4;
+            font-size: 20px;
+            margin-top: 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .section h3 {
+            color: #333;
+            font-size: 14px;
+            font-weight: bold;
+            margin-top: 15px;
+        }
+        .checklist {
+            display: flex;
+            align-items: center;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .checkmark {
+            color: #07a41e;
+            font-weight: bold;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+        .badge-complete {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .code-block {
+            background-color: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        table th {
+            background-color: #0078d4;
+            color: white;
+            padding: 10px;
+            text-align: left;
+            font-weight: bold;
+        }
+        table td {
+            border: 1px solid #ddd;
+            padding: 10px;
+            font-size: 13px;
+        }
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .diagram {
+            background-color: #f0f8ff;
+            border: 1px solid #87ceeb;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: monospace;
+            margin: 15px 0;
+            font-size: 11px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .summary {
+            background-color: #e8f4f8;
+            border-left: 4px solid #17a2b8;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 4px;
+        }
+        .status-complete {
+            color: #07a41e;
+            font-weight: bold;
+        }
+        .status-pending {
+            color: #ff6600;
+            font-weight: bold;
+        }
+        ul {
+            margin: 10px 0;
+            padding-left: 25px;
+        }
+        li {
+            margin: 8px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📋 EVIDENCIAS REQUERIDAS - FASE 1</h1>
+        <h2>FinBank: Extracción del Módulo Accounts como Microservicio</h2>
+        <p><strong>Fecha:</strong> 2026-06-29 | <strong>Proyecto:</strong> FinBank Monolithic → Microservices Migration</p>
+        <p><strong>Fase:</strong> 1 - Accounts Microservice Extraction | <strong>Estado:</strong> <span class="status-complete">✅ COMPLETADO</span></p>
+    </div>
+
+    <!-- EVIDENCIA 1 -->
+    <div class="section">
+        <h2>1️⃣ Justificación Documentada de la Elección del Módulo</h2>
+
+        <h3>📄 Documento Fuente</h3>
+        <div class="checklist">
+            <span class="checkmark">✓</span>
+            <strong>Ubicación:</strong> docs/adr/ADR-001-accounts-first-extraction.md
+        </div>
+
+        <h3>✅ Justificación Proporcionada</h3>
+
+        <h4>¿Por qué Accounts fue elegido como MS1?</h4>
+
+        <p><strong>Autonomía de Dominio</strong></p>
+        <ul>
+            <li>El módulo Accounts tiene responsabilidad única: gestionar cuentas bancarias</li>
+            <li>Interfaz clara y bien definida (crear, consultar, debitar, acreditar)</li>
+            <li>No depende de otros módulos del monolito</li>
+        </ul>
+
+        <p><strong>Dependencias Inversas (Otros módulos dependen de Accounts)</strong></p>
+        <ul>
+            <li><strong>Transfers:</strong> Necesita verificar cuentas, debitar, acreditar</li>
+            <li><strong>Notifications:</strong> Podría necesitar información de cuentas</li>
+            <li><strong>Audit:</strong> Audita operaciones de cuentas</li>
+            <li>Esto hace que Accounts sea <strong>cimiento arquitectónico</strong></li>
+        </ul>
+
+        <p><strong>Complejidad Moderada</strong></p>
+        <ul>
+            <li>Lógica de dominio clara (Account aggregate, Money value object)</li>
+            <li>Repositorio simple (CRUD + búsqueda)</li>
+            <li>Fácil de testear y desplegar independientemente</li>
+        </ul>
+
+        <p><strong>Bajo Riesgo de Extracción</strong></p>
+        <ul>
+            <li>Sin dependencias circulares</li>
+            <li>Datos bien segregados en schema accounts.*</li>
+            <li>Migración de datos directa (1:1 copy)</li>
+        </ul>
+
+        <h3>Comparación con Alternativas</h3>
+        <table>
+            <tr>
+                <th>Módulo</th>
+                <th>Autonomía</th>
+                <th>Dependencias</th>
+                <th>Complejidad</th>
+                <th>Riesgo</th>
+            </tr>
+            <tr>
+                <td><strong>Accounts ✅</strong></td>
+                <td>Alta</td>
+                <td>Muchos dependen</td>
+                <td>Moderada</td>
+                <td>Bajo</td>
+            </tr>
+            <tr>
+                <td>Transfers</td>
+                <td>Media</td>
+                <td>Auth (crítico)</td>
+                <td>Alta</td>
+                <td>Alto</td>
+            </tr>
+            <tr>
+                <td>Notifications</td>
+                <td>Alta</td>
+                <td>Todos</td>
+                <td>Baja</td>
+                <td>Medio</td>
+            </tr>
+            <tr>
+                <td>Audit</td>
+                <td>Alta</td>
+                <td>Todos</td>
+                <td>Baja</td>
+                <td>Bajo</td>
+            </tr>
+        </table>
+
+        <div class="summary">
+            <strong>✓ Conclusión:</strong> Accounts es la opción óptima para MS1 por su equilibrio entre autonomía, impacto y riesgo.
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 2 -->
+    <div class="section">
+        <h2>2️⃣ Microservicio Funcionando Autónomamente</h2>
+
+        <h3>📁 Estructura del Proyecto</h3>
+        <div class="code-block">services/accounts-service/
+├── AccountsService.csproj        # Proyecto .NET 10
+├── Program.cs                    # Configuración + DI
+├── Dockerfile                    # Multi-stage build
+├── Domain/
+│   ├── Account.cs               # Entidad agregada
+│   └── Money.cs                 # Value object
+├── Application/
+│   ├── Ports/IAccountsRepository.cs
+│   ├── Dtos/AccountSummary.cs
+│   └── AccountsUseCase.cs
+├── Infrastructure/
+│   ├── AccountsDbContext.cs
+│   ├── AccountsRepository.cs
+│   └── Migrations/
+└── Api/
+    └── AccountsEndpoints.cs</div>
+
+        <h3>✅ Base de Datos Propia</h3>
+
+        <p><strong>Configuración Docker:</strong></p>
+        <div class="code-block">postgres-accounts:
+  image: postgres:16
+  environment:
+    POSTGRES_DB: finbank_accounts
+    POSTGRES_USER: bank
+    POSTGRES_PASSWORD: bank
+  ports:
+    - "5434:5432"
+  volumes:
+    - postgres_accounts_data:/var/lib/postgresql/data</div>
+
+        <p><strong>Detalles:</strong></p>
+        <ul>
+            <li><strong>Base de datos:</strong> finbank_accounts</li>
+            <li><strong>Puerto:</strong> 5434 (aislado del monolito)</li>
+            <li><strong>Usuario:</strong> bank / bank</li>
+            <li><strong>Schema:</strong> accounts.* (exclusivo)</li>
+        </ul>
+
+        <h3>✅ Tablas Creadas (vía EF Core)</h3>
+        <div class="code-block">CREATE SCHEMA accounts;
+
+CREATE TABLE accounts.accounts (
+    id uuid NOT NULL PRIMARY KEY,
+    user_id uuid NOT NULL,
+    account_number varchar(20) NOT NULL UNIQUE,
+    balance numeric(19,4) NOT NULL,
+    created_at timestamp DEFAULT NOW()
+);</div>
+
+        <h3>✅ Endpoints Expuestos</h3>
+        <ul>
+            <li>GET /accounts - Lista cuentas del usuario</li>
+            <li>POST /accounts - Crea nueva cuenta</li>
+            <li>GET /accounts/{id}/balance - Obtiene balance</li>
+            <li>POST /accounts/{id}/debit - Debita cuenta</li>
+            <li>POST /accounts/{id}/credit - Acredita cuenta</li>
+            <li>GET /health - Health check</li>
+        </ul>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Microservicio autónomo completamente funcional</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 3 -->
+    <div class="section">
+        <h2>3️⃣ Gateway Enrutando Tráfico</h2>
+
+        <h3>📄 Configuración YARP</h3>
+        <p><strong>Ubicación:</strong> gateway/appsettings.json</p>
+
+        <h3>🔄 Flujo de Enrutamiento</h3>
+
+        <p><strong>Solicitud 1: POST /accounts</strong></p>
+        <div class="diagram">Cliente
+  └─ HTTP POST http://localhost:5000/accounts
+
+Gateway (YARP)
+  ├─ Evalúa rutas en orden de prioridad
+  ├─ Coincide: /accounts/** (Priority 10)
+  └─ Dirige a: http://accounts-service:8080/accounts
+
+Accounts MS (responde)
+
+Cliente (recibe respuesta 201 Created)</div>
+
+        <p><strong>Solicitud 2: POST /transfers</strong></p>
+        <div class="diagram">Cliente
+  └─ HTTP POST http://localhost:5000/transfers
+
+Gateway (YARP)
+  ├─ Evalúa rutas
+  ├─ No coincide con accounts-route
+  ├─ Coincide catch-all (Priority 100)
+  └─ Dirige a: http://monolith:8080/transfers
+
+Monolith (responde)
+
+Cliente (recibe respuesta)</div>
+
+        <h3>✅ Propagación de Headers</h3>
+        <p><strong>Headers preservados:</strong></p>
+        <ul>
+            <li>Authorization: Bearer {token}</li>
+            <li>Content-Type: application/json</li>
+            <li>X-Request-ID, X-Forwarded-For, etc.</li>
+        </ul>
+
+        <h3>✅ Validación de Enrutamiento</h3>
+        <table>
+            <tr>
+                <th>Endpoint</th>
+                <th>Destino</th>
+                <th>Status</th>
+            </tr>
+            <tr>
+                <td>GET /accounts</td>
+                <td>Accounts MS (5001)</td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>POST /accounts</td>
+                <td>Accounts MS (5001)</td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>POST /transfers</td>
+                <td>Monolith (5010)</td>
+                <td>✅</td>
+            </tr>
+            <tr>
+                <td>POST /auth/login</td>
+                <td>Monolith (5010)</td>
+                <td>✅</td>
+            </tr>
+        </table>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Gateway enrutando correctamente</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 4 -->
+    <div class="section">
+        <h2>4️⃣ Diagrama de Arquitectura Actualizado</h2>
+
+        <h3>📊 Arquitectura Phase 1</h3>
+        <div class="diagram">┌──────────────────────────────────────┐
+│         Cliente (HTTP)              │
+└───────────────────┬──────────────────┘
+                    │ :5000
+                    ▼
+    ┌──────────────────────────────┐
+    │   YARP API Gateway           │
+    │  ┌────────────────────────┐  │
+    │  │ /accounts/** → MS1     │  │
+    │  │ /** (catch) → Monolith │  │
+    │  └────────────────────────┘  │
+    └──────────┬──────────────┬────┘
+               │              │
+               │ :8080        │ :8080
+               ▼              ▼
+    ┌──────────────────┐  ┌──────────────┐
+    │ Accounts MS      │  │ Monolith     │
+    │ (puerto 5001)    │  │ (puerto 5010)│
+    │                  │  │              │
+    │ Hexagonal Arch   │  │ Auth Module  │
+    │ ┌──────────────┐ │  │ Transfers... │
+    │ │ Domain       │ │  └──────────────┘
+    │ │ Application  │ │         ▲
+    │ │ Infrastructure
+    │ └──────────────┘ │         │
+    └────────┬─────────┘         │
+             │ JDBC              │ HTTP
+             ▼                   ▼
+    ┌──────────────────┐  ┌──────────────┐
+    │ PostgreSQL       │  │ PostgreSQL   │
+    │ :5434            │  │ :5433        │
+    │ finbank_accounts │  │ modular_... │
+    └──────────────────┘  └──────────────┘</div>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Diagrama de arquitectura actualizado y documentado</span>
+        </div>
+    </div>
+
+    <!-- EVIDENCIA 5 -->
+    <div class="section">
+        <h2>5️⃣ Estrategia de Migración de Datos</h2>
+
+        <h3>📋 Fases de Migración (Zero-Downtime)</h3>
+
+        <h4>FASE A: Dual-Write (Estado Actual)</h4>
+        <p><strong>Descripción:</strong> Escrituras en ambas BDs simultáneamente</p>
+        <ul>
+            <li>✅ Sin downtime</li>
+            <li>✅ Reversible en cualquier momento</li>
+            <li>✅ Ambas BDs en sincronía</li>
+        </ul>
+
+        <h4>FASE B: Backfill (Phase 2)</h4>
+        <p><strong>Descripción:</strong> Copiar datos históricos a nueva BD</p>
+        <div class="code-block">INSERT INTO finbank_accounts.accounts.accounts
+SELECT * FROM modular_bank_dotnet.public.accounts
+WHERE id NOT IN (SELECT id FROM finbank_accounts.accounts.accounts);</div>
+
+        <h4>FASE C: Read Switchover (Phase 3)</h4>
+        <p><strong>Descripción:</strong> Leer de MS1, dejar de leer del monolito</p>
+
+        <h4>FASE D: Stop Dual-Write (Phase 3+)</h4>
+        <p><strong>Descripción:</strong> Dejar de escribir en monolith/accounts</p>
+
+        <h3>📊 Timeline</h3>
+        <div class="diagram">Phase 1 (Actual)    Phase 2           Phase 3+
+├─ Dual-Write      ├─ Backfill        ├─ Stop DW
+│ Duración: 1-2w   │ Duración: 1d     │ Duración: 1h
+│ Sin downtime     │ Sin downtime     │ Reversible
+└─ Reversible      └─ Validable       └─ Código solo</div>
+
+        <h3>✅ Rollback Plan</h3>
+        <ul>
+            <li><strong>Si falla:</strong> Revert código + volver a leer de monolith</li>
+            <li><strong>Tiempo rollback:</strong> &lt; 5 minutos</li>
+            <li><strong>Pérdida de datos:</strong> Ninguna</li>
+        </ul>
+
+        <div class="summary">
+            <strong>✓ Status:</strong> <span class="status-complete">Estrategia de migración documentada y viable</span>
+        </div>
+    </div>
+
+    <!-- RESUMEN FINAL -->
+    <div class="section">
+        <h2>📊 RESUMEN EJECUTIVO</h2>
+
+        <h3>✅ TODAS LAS EVIDENCIAS COMPLETADAS</h3>
+        <table>
+            <tr>
+                <th>#</th>
+                <th>Evidencia</th>
+                <th>Estado</th>
+                <th>Ubicación</th>
+            </tr>
+            <tr>
+                <td>1</td>
+                <td>Justificación módulo</td>
+                <td><span class="status-complete">✅</span></td>
+                <td>docs/adr/ADR-001</td>
+            </tr>
+            <tr>
+                <td>2</td>
+                <td>MS autónomo con BD</td>
+                <td><span class="status-complete">✅</span></td>
+                <td>services/accounts-service/</td>
+            </tr>
+            <tr>
+                <td>3</td>
+                <td>Gateway enrutando</td>
+                <td><span class="status-complete">✅</span></td>
+                <td>gateway/</td>
+            </tr>
+            <tr>
+                <td>4</td>
+                <td>Diagrama arquitectura</td>
+                <td><span class="status-complete">✅</span></td>
+                <td>docs/ARCHITECTURE-PHASE-1.md</td>
+            </tr>
+            <tr>
+                <td>5</td>
+                <td>Estrategia migración</td>
+                <td><span class="status-complete">✅</span></td>
+                <td>docs/adr/ADR-011</td>
+            </tr>
+        </table>
+
+        <h3>📈 Métricas Phase 1</h3>
+        <ul>
+            <li><strong>Microservicios autónomos:</strong> 1 (Accounts MS)</li>
+            <li><strong>Bases de datos independientes:</strong> 1 (postgres-accounts)</li>
+            <li><strong>Endpoints MS1:</strong> 5 (GET/POST /accounts, GET /balance, etc.)</li>
+            <li><strong>Líneas de código:</strong> ~800 (Accounts MS) + 300 (Gateway)</li>
+            <li><strong>ADRs documentados:</strong> 11 (todas justificadas)</li>
+            <li><strong>Test scenarios:</strong> 10 (PHASE-1-TESTING.md)</li>
+            <li><strong>Zero-downtime:</strong> ✅ Sí (Feature flags + Dual-write)</li>
+        </ul>
+
+        <div class="summary">
+            <h3>🚀 Estado para Production</h3>
+            <p><strong>Phase 1 está listo para:</strong></p>
+            <ul>
+                <li>✅ Desplegar en Docker</li>
+                <li>✅ Ejecutar en producción</li>
+                <li>✅ Hacer rollback sin pérdida de datos</li>
+                <li>✅ Escalar Accounts MS independientemente</li>
+                <li>✅ Continuar con Phase 2 (Transfers MS)</li>
+            </ul>
+
+        </div>
+    </div>
+
+    <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 2px solid #0078d4; color: #666; font-size: 12px;">
+        <p><strong>Documento generado automáticamente</strong> | FinBank Microservices Project | 2026-06-29</p>
+    </div>
+</body>
+</html>
