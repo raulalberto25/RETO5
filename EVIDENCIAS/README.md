@@ -61,16 +61,45 @@ EVIDENCIAS/
 
 ---
 
-## ⏳ FASE 2: Extracción de Transfers MS (COMPLETADA - Evidencias Pendientes)
+## ✅ FASE 2: Extracción de Transfers MS (COMPLETADA)
 
-**Estado:** Código completado en repositorio  
-**Siguiente paso:** Crear documentos de evidencia
+**Estado:** ✅ Código completado + Evidencias documentadas
 
-Requiere las siguientes evidencias:
-- [ ] Diagrama de arquitectura Phase 2
-- [ ] Documentación de Saga Choreography
-- [ ] Documentación de Outbox Pattern
-- [ ] Estrategia de comunicación asincrónica
+### 📄 Documentos Disponibles
+
+| Formato | Ubicación | Descripción |
+|---------|-----------|-------------|
+| **Markdown** | `FASE 2/EVIDENCIAS_FASE_2.md` | Documento completo en Markdown |
+| **Word/HTML** | `FASE 2/EVIDENCIAS_FASE_2.docx.html` | Documento HTML compatible con Microsoft Word |
+
+### ✅ Evidencias Completadas (5/5)
+
+- [x] **Justificación del segundo módulo y relación de dependencia con MS1**
+  - Por qué Transfers fue elegido como MS2
+  - Relación de dependencia con Accounts (MS1)
+  - Matriz de dependencias entre módulos
+
+- [x] **Segundo microservicio funcionando autónomamente con BD propia**
+  - Estructura Hexagonal completa
+  - Base de datos exclusiva `postgres-transfers`
+  - Endpoints funcionales (POST /transfers, GET /transfers?accountId=)
+
+- [x] **Comunicación asincrónica vía RabbitMQ funcionando**
+  - Outbox Pattern (garantía de entrega)
+  - OutboxWorker (background service)
+  - NotificationsConsumer + AuditConsumer
+  - At-least-once delivery semantics
+
+- [x] **Diagrama de arquitectura final: Gateway → MS1 / MS2 / Monolito**
+  - Arquitectura Phase 2 completa
+  - Flujo end-to-end documentado
+  - RabbitMQ enrutamiento hacia consumers
+
+- [x] **Patrón de consistencia distribuida**
+  - Saga Choreography implementado
+  - Eventual Consistency model
+  - Timeline de consistencia
+  - Handling de fallos
 
 ---
 
@@ -186,12 +215,12 @@ src/ModularBank/             # Monolito (residual)
 ## ✅ Checklist de Completitud
 
 - [x] FASE 1: 5/5 evidencias completadas
-- [ ] FASE 2: Pendiente
+- [x] FASE 2: 5/5 evidencias completadas
 - [ ] FASE 3: Pendiente
 - [ ] FASE 4: Pendiente
 - [ ] FASE 5: Pendiente
 
-**Total Progreso:** 5/25 evidencias documentadas (20%)
+**Total Progreso:** 10/25 evidencias documentadas (40%)
 
 ---
 
