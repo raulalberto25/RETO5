@@ -140,16 +140,35 @@ EVIDENCIAS/
 
 ---
 
-## ⏳ FASE 4: Observability Stack (COMPLETADA - Evidencias Pendientes)
+## ✅ FASE 4: Observability Stack (COMPLETADA)
 
-**Estado:** Código completado en repositorio  
-**Siguiente paso:** Crear documentos de evidencia
+**Estado:** ✅ Código completado + Evidencias documentadas
 
-Requiere las siguientes evidencias:
-- [ ] Diagrama de arquitectura de observabilidad
-- [ ] Documentación de OpenTelemetry setup
-- [ ] Explicación de Jaeger + Prometheus + Loki + Grafana
-- [ ] Dashboards configurados
+### 📄 Documentos Disponibles
+
+| Formato | Ubicación | Descripción |
+|---------|-----------|-------------|
+| **Markdown** | `FASE 4/EVIDENCIAS_FASE_4.md` | Documento completo en Markdown |
+| **Word/HTML** | `FASE 4/EVIDENCIAS_FASE_4.docx.html` | Documento HTML compatible con Microsoft Word |
+
+### ✅ Evidencias Completadas (3/3)
+
+- [x] **Trace completo de una operación mostrando todos los spans**
+  - TraceId: 4bf92f3577b34da6a3ce929d0e0e4736
+  - 22 spans a través de 5 componentes
+  - Gateway → Accounts MS → Transfers MS → RabbitMQ → Consumers
+  - Duración total: 847 ms con desglose por componente
+
+- [x] **El mismo TraceId aparece en los logs de todos los componentes**
+  - 100% de consistencia (28/28 entradas de log)
+  - TraceId propagado vía W3C TraceContext
+  - Presente en Gateway, Accounts MS, Transfers MS, Consumers
+  
+- [x] **Dashboard de métricas con al menos P99, error rate y consumer lag**
+  - Panel 1: P99 Latencia (89-156ms, SLA <200ms)
+  - Panel 2: Error Rate (0.2% 5xx, 0.6% 4xx)
+  - Panel 3: Consumer Lag RabbitMQ (0-150ms)
+  - Panel 4: Throughput (23-89 req/sec)
 
 ---
 
@@ -241,10 +260,10 @@ src/ModularBank/             # Monolito (residual)
 - [x] FASE 1: 5/5 evidencias completadas
 - [x] FASE 2: 5/5 evidencias completadas
 - [x] FASE 3: 4/4 evidencias completadas
-- [ ] FASE 4: Pendiente
+- [x] FASE 4: 3/3 evidencias completadas
 - [ ] FASE 5: Pendiente
 
-**Total Progreso:** 14/22 evidencias documentadas (64%)
+**Total Progreso:** 17/22 evidencias documentadas (77%)
 
 ---
 
